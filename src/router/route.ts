@@ -60,12 +60,12 @@ export const dynamicRoutes: Array<RouteRecordRaw> = [
 					roles: ['admin'],
 					icon: 'iconfont icon-diannao',
 				},
-			}
+			},
 		],
 	},
 ];
 
-export const demoRoutes:Array<RouteRecordRaw> = [
+export const demoRoutes: Array<RouteRecordRaw> = [
 	{
 		path: '/demo',
 		name: 'demo',
@@ -81,7 +81,7 @@ export const demoRoutes:Array<RouteRecordRaw> = [
 			roles: ['admin'],
 			icon: 'iconfont icon-diannao',
 		},
-		children:[
+		children: [
 			{
 				path: '/demo/system',
 				name: 'system',
@@ -782,7 +782,7 @@ export const demoRoutes:Array<RouteRecordRaw> = [
 							roles: ['admin'],
 							icon: 'iconfont icon-diannao',
 						},
-					}
+					},
 				],
 			},
 			{
@@ -1068,9 +1068,9 @@ export const demoRoutes:Array<RouteRecordRaw> = [
 					icon: 'iconfont icon-shouye_dongtaihui',
 				},
 			},
-		]
-	}
-]
+		],
+	},
+];
 
 /**
  * 定义404、401界面
@@ -1138,5 +1138,5 @@ export const staticRoutes: Array<RouteRecordRaw> = [
 		meta: {
 			title: '加载中',
 		},
-	}
+	},
 ];
