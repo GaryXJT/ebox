@@ -1,110 +1,62 @@
 <template>
 	<div class="system-edit-user-container">
-		<el-dialog :title="(ruleForm.userId!==0?'修改':'添加')+'用户'" v-model="isShowDialog" width="769px">
+		<el-dialog :title="(ruleForm.id !== 0 ? '修改' : '添加') + '用户'" v-model="isShowDialog" width="769px">
 			<el-form ref="formRef" :model="ruleForm" :rules="rules" size="default" label-width="90px">
 				<el-row :gutter="35">
-					<el-col :xs="24" :sm="12" :md="12" :lg="12" :xl="12"  v-if="ruleForm.userId===0">
-						<el-form-item label="用户名" prop="userName">
-							<el-input v-model="ruleForm.userName" placeholder="请输入账户名称" clearable></el-input>
+					<el-col :xs="24" :sm="12" :md="12" :lg="12" :xl="12">
+						<el-form-item label="姓名" prop="name">
+							<el-input v-model="ruleForm.name" placeholder="请输入姓名" clearable></el-input>
 						</el-form-item>
 					</el-col>
-          <el-col :xs="24" :sm="12" :md="12" :lg="12" :xl="12"  v-if="ruleForm.userId===0">
-            <el-form-item label="账户密码" prop="password">
-              <el-input v-model="ruleForm.password" placeholder="请输入" type="password" clearable></el-input>
-            </el-form-item>
-          </el-col>
-					<el-col :xs="24" :sm="12" :md="12" :lg="12" :xl="12" >
-						<el-form-item label="用户昵称" prop="nickName">
-							<el-input v-model="ruleForm.nickName" placeholder="请输入用户昵称" clearable></el-input>
-						</el-form-item>
-					</el-col>
-					<el-col :xs="24" :sm="12" :md="12" :lg="12" :xl="12" >
-						<el-form-item label="关联角色" prop="roleIds">
-              <el-cascader
-                  :options="roleList"
-                  :props="{ checkStrictly: true,emitPath: false, value: 'id', label: 'name',multiple: true }"
-                  placeholder="请选择角色"
-                  clearable
-                  class="w100"
-                  v-model="ruleForm.roleIds"
-              >
-                <template #default="{ node, data }">
-                  <span>{{ data.name }}</span>
-                  <span v-if="!node.isLeaf"> ({{ data.children.length }}) </span>
-                </template>
-              </el-cascader>
-						</el-form-item>
-					</el-col>
-					<el-col :xs="24" :sm="12" :md="12" :lg="12" :xl="12" >
-						<el-form-item label="部门" prop="deptId">
-							<el-cascader
-								:options="deptData"
-								:props="{ checkStrictly: true,emitPath: false, value: 'deptId', label: 'deptName' }"
-								placeholder="请选择部门"
-								clearable
-								class="w100"
-								v-model="ruleForm.deptId"
-							>
-								<template #default="{ node, data }">
-									<span>{{ data.deptName }}</span>
-									<span v-if="!node.isLeaf"> ({{ data.children.length }}) </span>
-								</template>
-							</el-cascader>
-						</el-form-item>
-					</el-col>
-					<el-col :xs="24" :sm="12" :md="12" :lg="12" :xl="12" >
-						<el-form-item label="手机号" prop="mobile">
-							<el-input v-model="ruleForm.mobile" placeholder="请输入手机号" clearable></el-input>
-						</el-form-item>
-					</el-col>
-					<el-col :xs="24" :sm="12" :md="12" :lg="12" :xl="12" >
-						<el-form-item label="邮箱" prop="email">
-							<el-input v-model="ruleForm.email" placeholder="请输入" clearable></el-input>
-						</el-form-item>
-					</el-col>
-					<el-col :xs="24" :sm="12" :md="12" :lg="12" :xl="12" >
-						<el-form-item label="性别" prop="sex">
-							<el-select v-model="ruleForm.sex" placeholder="请选择" clearable class="w100">
-								<el-option
-                   v-for="gender in genderData"
-                   :key="'gender-'+gender.value"
-                   :label="gender.label"
-                   :value="gender.value"></el-option>
+					<el-col :xs="24" :sm="12" :md="12" :lg="12" :xl="12">
+						<el-form-item label="部门" prop="deptName">
+							<el-select v-model="ruleForm.deptName" placeholder="请选择部门" clearable class="w100">
+								<el-option label="生产部" value="生产部"></el-option>
+								<el-option label="质检部" value="质检部"></el-option>
+								<el-option label="研发部" value="研发部"></el-option>
+								<el-option label="工程部" value="工程部"></el-option>
 							</el-select>
 						</el-form-item>
 					</el-col>
-					<el-col :xs="24" :sm="12" :md="12" :lg="12" :xl="12" >
-						<el-form-item label="岗位" prop="postIds">
-              <el-select v-model="ruleForm.postIds" placeholder="请选择" clearable class="w100" multiple>
-                <el-option
-                    v-for="post in postList"
-                    :key="'post-'+post.postId"
-                    :label="post.postName"
-                    :value="post.postId">
-                </el-option>
-              </el-select>
+					<el-col :xs="24" :sm="12" :md="12" :lg="12" :xl="12">
+						<el-form-item label="性别" prop="gender">
+							<el-select v-model="ruleForm.gender" placeholder="请选择性别" clearable class="w100">
+								<el-option label="男" value="男"></el-option>
+								<el-option label="女" value="女"></el-option>
+							</el-select>
 						</el-form-item>
 					</el-col>
-					<el-col :xs="24" :sm="12" :md="12" :lg="12" :xl="12" >
-						<el-form-item label="用户状态">
-							<el-switch v-model="ruleForm.status" inline-prompt :active-value="1" :inactive-value="0" active-text="启" inactive-text="禁"></el-switch>
+					<el-col :xs="24" :sm="12" :md="12" :lg="12" :xl="12">
+						<el-form-item label="权限" prop="permissions">
+							<el-select v-model="ruleForm.permissions" placeholder="请选择权限" clearable class="w100" multiple>
+								<el-option label="操作员" value="操作员"></el-option>
+								<el-option label="质检员" value="质检员"></el-option>
+								<el-option label="工程师" value="工程师"></el-option>
+								<el-option label="主管" value="主管"></el-option>
+							</el-select>
 						</el-form-item>
 					</el-col>
-          <el-col :span="24">
-            <el-form-item label="用户类型">
-              <el-radio-group v-model="ruleForm.isAdmin">
-                <el-radio
-                    :value="1"
-                >后台管理员</el-radio>
-                <el-radio
-                    :value="0"
-                >前台用户</el-radio>
-              </el-radio-group>
-            </el-form-item>
-          </el-col>
-					<el-col :xs="24" :sm="24" :md="24" :lg="24" :xl="24" >
-						<el-form-item label="用户描述">
-							<el-input v-model="ruleForm.remark" type="textarea" placeholder="请输入用户描述" maxlength="150"></el-input>
+					<el-col :xs="24" :sm="12" :md="12" :lg="12" :xl="12">
+						<el-form-item label="任务状态" prop="taskStatus">
+							<el-select v-model="ruleForm.taskStatus" placeholder="请选择状态" clearable class="w100">
+								<el-option :label="'任务中'" :value="1"></el-option>
+								<el-option :label="'无任务'" :value="0"></el-option>
+							</el-select>
+						</el-form-item>
+					</el-col>
+					<el-col :xs="24" :sm="12" :md="12" :lg="12" :xl="12">
+						<el-form-item label="RFID卡号" prop="rfidCard">
+							<el-input v-model="ruleForm.rfidCard" placeholder="请输入RFID卡号" clearable></el-input>
+						</el-form-item>
+					</el-col>
+					<el-col :xs="24" :sm="12" :md="12" :lg="12" :xl="12">
+						<el-form-item label="指纹码" prop="fingerprint">
+							<el-input v-model="ruleForm.fingerprint" placeholder="请输入指纹码" clearable></el-input>
+						</el-form-item>
+					</el-col>
+					<el-col :xs="24" :sm="24" :md="24" :lg="24" :xl="24">
+						<el-form-item label="备注">
+							<el-input v-model="ruleForm.remarks" type="textarea" placeholder="请输入备注" maxlength="150"></el-input>
 						</el-form-item>
 					</el-col>
 				</el-row>
@@ -112,7 +64,7 @@
 			<template #footer>
 				<span class="dialog-footer">
 					<el-button @click="onCancel" size="default">取 消</el-button>
-					<el-button type="primary" @click="onSubmit" size="default">{{ruleForm.userId!==0?'修 改':'添 加'}}</el-button>
+					<el-button type="primary" @click="onSubmit" size="default">{{ ruleForm.id !== 0 ? '修 改' : '添 加' }}</el-button>
 				</span>
 			</template>
 		</el-dialog>
@@ -120,167 +72,119 @@
 </template>
 
 <script setup lang="ts">
-import {reactive, toRefs, onMounted, defineComponent, ref, unref, getCurrentInstance} from 'vue';
-import {getParams, addUser, editUser, getEditUser} from "/@/api/system/user";
-import {ElMessage} from "element-plus";
+import { reactive, toRefs, ref, unref } from 'vue';
+import { ElMessage } from 'element-plus';
 
-defineOptions({ name: "systemEditUser"})
-const props = defineProps({
-  deptData:{
-    type:Array,
-    default:()=>[]
-  },
-  genderData:{
-    type:Array,
-    default:()=>[]
-  }
-})
+// 定义接口来定义对象的类型
+interface RuleForm {
+	id: number;
+	name: string;
+	deptName: string;
+	gender: string;
+	permissions: string[];
+	taskStatus: number;
+	rfidCard: string;
+	fingerprint: string;
+	remarks: string;
+}
+
+defineOptions({ name: 'systemEditUser' });
+
 const emit = defineEmits(['getUserList']);
-const {proxy} = getCurrentInstance() as any;
-const roleList = ref([]);
-const postList = ref([]);
-const formRef = ref<HTMLElement | null>(null);
+const formRef = ref();
+
 const state = reactive({
-  isShowDialog: false,
-  ruleForm: {
-    userId: 0,
-    deptId: 0,
-    userName: '',
-    nickName: '',
-    password: '',
-    mobile:'',
-    email: '',
-    sex: '',
-    status: 1,
-    remark: '',
-    postIds: [],
-    roleIds: [],
-    isAdmin:0,
-  },
-  //表单校验
-  rules: {
-    userName: [
-      { required: true, message: "用户名称不能为空", trigger: "blur" }
-    ],
-    nickName: [
-      { required: true, message: "用户昵称不能为空", trigger: "blur" }
-    ],
-    deptId: [
-      { required: true, message: "归属部门不能为空", trigger: "blur" }
-    ],
-    password: [
-      { required: true, message: "用户密码不能为空", trigger: "blur" }
-    ],
-    email: [
-      {
-        type: "email",
-        message: "'请输入正确的邮箱地址",
-        trigger: ["blur", "change"]
-      }
-    ],
-    mobile: [
-      { required: true, message: "手机号码不能为空", trigger: "blur" },
-      {
-        pattern: /^1[3|4|5|6|7|8|9][0-9]\d{8}$/,
-        message: "请输入正确的手机号码",
-        trigger: "blur"
-      }
-    ]
-  }
+	isShowDialog: false,
+	ruleForm: {
+		id: 0,
+		name: '',
+		deptName: '',
+		gender: '',
+		permissions: [],
+		taskStatus: 0,
+		rfidCard: '',
+		fingerprint: '',
+		remarks: '',
+	} as RuleForm,
+	rules: {
+		name: [{ required: true, message: '请输入姓名', trigger: 'blur' }],
+		deptName: [{ required: true, message: '请选择部门', trigger: 'change' }],
+		gender: [{ required: true, message: '请选择性别', trigger: 'change' }],
+		permissions: [{ required: true, message: '请选择权限', trigger: 'change' }],
+		rfidCard: [{ required: true, message: '请输入RFID卡号', trigger: 'blur' }],
+		fingerprint: [{ required: true, message: '请输入指纹码', trigger: 'blur' }],
+	},
 });
-const { ruleForm, isShowDialog, rules}=toRefs(state)
+
+const { ruleForm, isShowDialog, rules } = toRefs(state);
+
 // 打开弹窗
-const openDialog = (row?:any) => {
-  resetForm()
-  if(row) {
-    getEditUser(row.id).then((res:any)=>{
-      const user = res.data.user;
-      state.ruleForm = {
-        userId: user.id,
-        deptId: user.deptId,
-        userName: user.userName,
-        nickName: user.userNickname,
-        password: '-',
-        mobile:user.mobile,
-        email: user.userEmail,
-        sex: String(user.sex),
-        status: user.userStatus,
-        remark: user.remark,
-        postIds: res.data.checkedPosts??[],
-        roleIds: res.data.checkedRoleIds??[],
-        isAdmin:user.isAdmin,
-      };
-    })
-  }
-  state.isShowDialog = true;
+const openDialog = (row?: any) => {
+	resetForm();
+	if (row) {
+		state.ruleForm = {
+			id: row.id,
+			name: row.name,
+			deptName: row.deptName,
+			gender: row.gender,
+			permissions: row.permissions,
+			taskStatus: row.taskStatus,
+			rfidCard: row.rfidCard,
+			fingerprint: row.fingerprint,
+			remarks: row.remarks,
+		};
+	}
+	state.isShowDialog = true;
 };
+
 // 关闭弹窗
 const closeDialog = () => {
-  state.isShowDialog = false;
+	state.isShowDialog = false;
 };
+
 // 取消
 const onCancel = () => {
-  closeDialog();
+	closeDialog();
 };
-// 新增
+
+// 提交
 const onSubmit = () => {
-  const formWrap = unref(formRef) as any;
-  if (!formWrap) return;
-  formWrap.validate((valid: boolean) => {
-    if (valid) {
-      if(state.ruleForm.userId===0){
-        //添加
-        addUser(state.ruleForm).then(()=>{
-          ElMessage.success('用户添加成功');
-          closeDialog(); // 关闭弹窗
-          emit('getUserList')
-        });
-      }else{
-        //修改
-        editUser(state.ruleForm).then(()=>{
-          ElMessage.success('用户修改成功');
-          closeDialog(); // 关闭弹窗
-          emit('getUserList')
-        });
-      }
-    }
-  });
+	const formWrap = unref(formRef) as any;
+	if (!formWrap) return;
+	formWrap.validate((valid: boolean) => {
+		if (valid) {
+			// 这里模拟提交成功
+			ElMessage.success(state.ruleForm.id === 0 ? '添加成功' : '修改成功');
+			closeDialog();
+			emit('getUserList');
+		}
+	});
 };
-// 初始化部门数据
-const initTableData = () => {
-  //获取角色岗位选项
-  getParams().then((res:any)=>{
-    const roles = res.data.roleList??[];
-    const roleAccess = res.data.roleAccess??[];
-    roles.map((item:any)=>{
-      if(!roleAccess.includes(item.id)){
-        item.disabled = true
-      }
-    })
-    roleList.value = proxy.handleTree(roles??[], "id","pid","children",true);
-    postList.value = res.data.posts??[];
-  });
+
+// 重置表单
+const resetForm = () => {
+	state.ruleForm = {
+		id: 0,
+		name: '',
+		deptName: '',
+		gender: '',
+		permissions: [],
+		taskStatus: 0,
+		rfidCard: '',
+		fingerprint: '',
+		remarks: '',
+	};
 };
-// 页面加载时
-onMounted(() => {
-  initTableData();
-});
-const resetForm = ()=>{
-  state.ruleForm = {
-    userId: 0,
-    deptId: 0,
-    userName: '',
-    nickName: '',
-    password: '',
-    mobile:'',
-    email: '',
-    sex: '',
-    status: 1,
-    remark: '',
-    postIds: [],
-    roleIds: [],
-    isAdmin:0,
-  }
-};
-defineExpose({openDialog})
+
+defineExpose({ openDialog });
 </script>
+
+<style scoped lang="scss">
+.w100 {
+	width: 100%;
+}
+.dialog-footer {
+	padding-right: 20px;
+	text-align: right;
+}
+</style>

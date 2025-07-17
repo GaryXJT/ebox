@@ -13,6 +13,8 @@
 							</el-icon>
 							查询
 						</el-button>
+					</el-form-item>
+					<div class="right-button-group">
 						<el-button size="default" type="success" class="ml10" @click="onOpenAddBox">
 							<el-icon>
 								<ele-FolderAdd />
@@ -25,62 +27,62 @@
 							</el-icon>
 							批量删除
 						</el-button>
-					</el-form-item>
+					</div>
 				</el-form>
 			</div>
 			<el-table :data="tableData.data" style="width: 100%" @selection-change="handleSelectionChange">
 				<el-table-column type="selection" width="55" align="center" />
-				<el-table-column type="index" label="序号" width="60" />
-				<el-table-column prop="boxId" label="编号ID" show-overflow-tooltip></el-table-column>
-				<el-table-column prop="specification" label="规格" show-overflow-tooltip>
+				<el-table-column type="index" label="序号" width="60" sortable />
+				<el-table-column prop="boxId" label="编号ID" show-overflow-tooltip sortable></el-table-column>
+				<el-table-column prop="specification" label="规格" show-overflow-tooltip sortable>
 					<template #default="scope">
 						<el-tag type="primary" v-if="scope.row.specification === 'suitcase'">手提箱</el-tag>
 						<el-tag type="warning" v-else-if="scope.row.specification === 'trolley'">拉杆箱</el-tag>
 						<el-tag v-else>{{ scope.row.specification }}</el-tag>
 					</template>
 				</el-table-column>
-				<el-table-column prop="bindingStatus" label="绑定状态" show-overflow-tooltip>
+				<el-table-column prop="bindingStatus" label="绑定状态" show-overflow-tooltip sortable>
 					<template #default="scope">
 						<el-tag type="success" v-if="scope.row.bindingStatus">是</el-tag>
 						<el-tag type="info" v-else>否</el-tag>
 					</template>
 				</el-table-column>
-				<el-table-column prop="taskStatus" label="任务状态" show-overflow-tooltip>
+				<el-table-column prop="taskStatus" label="任务状态" show-overflow-tooltip sortable>
 					<template #default="scope">
 						<el-tag type="warning" v-if="scope.row.taskStatus === 'running'">任务中</el-tag>
 						<el-tag type="info" v-else>无</el-tag>
 					</template>
 				</el-table-column>
-				<el-table-column prop="coverStatus" label="开盖状态" show-overflow-tooltip>
+				<el-table-column prop="coverStatus" label="开盖状态" show-overflow-tooltip sortable>
 					<template #default="scope">
 						<el-tag type="danger" v-if="scope.row.coverStatus === 'open'">开</el-tag>
 						<el-tag type="success" v-else>关</el-tag>
 					</template>
 				</el-table-column>
-				<el-table-column prop="healthStatus" label="健康状态" show-overflow-tooltip>
+				<el-table-column prop="healthStatus" label="健康状态" show-overflow-tooltip sortable>
 					<template #default="scope">
 						<el-tag type="success" v-if="scope.row.healthStatus === 'healthy'">健康</el-tag>
 						<el-tag type="danger" v-else>异常</el-tag>
 					</template>
 				</el-table-column>
-				<el-table-column prop="fenceStatus" label="电子围栏状态" show-overflow-tooltip>
+				<el-table-column prop="fenceStatus" label="电子围栏状态" show-overflow-tooltip sortable>
 					<template #default="scope">
 						<el-tag type="success" v-if="scope.row.fenceStatus === 'normal'">正常</el-tag>
 						<el-tag type="warning" v-else>警告</el-tag>
 					</template>
 				</el-table-column>
-				<el-table-column prop="batteryLevel" label="电量状态" show-overflow-tooltip>
+				<el-table-column prop="batteryLevel" label="电量状态" show-overflow-tooltip sortable>
 					<template #default="scope">
 						<span :style="{ color: scope.row.batteryLevel < 20 ? '#F56C6C' : '#67C23A' }"> {{ scope.row.batteryLevel }}% </span>
 					</template>
 				</el-table-column>
-				<el-table-column prop="createdAt" label="创建时间" show-overflow-tooltip></el-table-column>
-				<el-table-column label="操作" width="280">
+				<el-table-column prop="createdAt" label="创建时间" width="180" show-overflow-tooltip sortable></el-table-column>
+				<el-table-column label="操作" width="240">
 					<template #default="scope">
 						<el-button size="small" text type="primary" @click="onGetLocation(scope.row)">当前定位</el-button>
 						<el-button size="small" text type="primary" @click="onGetTrajectory(scope.row)">轨迹记录</el-button>
-						<el-button size="small" text type="danger" @click="onRowDel(scope.row)">删除箱体库存</el-button>
 						<el-button size="small" text type="success" @click="onActivateBox(scope.row)">激活</el-button>
+						<el-button size="small" text type="danger" @click="onRowDel(scope.row)">删除</el-button>
 					</template>
 				</el-table-column>
 			</el-table>
@@ -90,6 +92,7 @@
 				v-model:page="tableData.param.pageNum"
 				v-model:limit="tableData.param.pageSize"
 				@pagination="boxList"
+				class="pagination-container"
 			/>
 		</el-card>
 		<!-- <EditBox ref="editBoxRef" @getBoxList="boxList" /> -->
@@ -377,3 +380,28 @@ const handleSelectionChange = (selection: Array<TableData>) => {
 	state.ids = selection.map((item) => item.id);
 };
 </script>
+
+<style scoped lang="scss">
+.system-box-container {
+	.system-user-search {
+		.el-form {
+			display: flex;
+			align-items: center;
+			flex-wrap: wrap;
+			.el-form-item {
+				margin-bottom: 0;
+			}
+			.right-button-group {
+				margin-left: auto;
+				display: flex;
+				align-items: center;
+			}
+		}
+	}
+	.pagination-container {
+		display: flex;
+		justify-content: flex-end;
+		margin-top: 20px;
+	}
+}
+</style>
