@@ -70,7 +70,7 @@
 				<el-table-column label="操作" width="200" fixed="right">
 					<template #default="scope">
 						<el-button size="small" text type="success" @click="handleRemoteOpen(scope.row)">远程开箱</el-button>
-						<el-button size="small" text type="primary" @click="handleLocation(scope.row)">定位信息</el-button>
+						<el-button size="small" text type="primary" @click="handleLocation(scope.row)">当前定位</el-button>
 						<el-button size="small" text type="danger" @click="handleUnbind(scope.row)">解绑</el-button>
 					</template>
 				</el-table-column>

@@ -96,6 +96,7 @@
 			/>
 		</el-card>
 		<!-- <EditBox ref="editBoxRef" @getBoxList="boxList" /> -->
+		<LocationMap ref="locationMapRef" />
 	</div>
 </template>
 
@@ -103,7 +104,9 @@
 import { toRefs, reactive, onMounted, ref, defineComponent, toRaw } from 'vue';
 import { ElMessageBox, ElMessage } from 'element-plus';
 // import EditBox from '/@/views/system/box/component/editBox.vue';
+import LocationMap from '/@/views/system/users/component/locationMap.vue';
 import { deleteBox, getBoxList, getBoxLocation, getBoxTrajectory, activateBox } from '/@/api/system/box';
+// TODO：定位 电子围栏的弹窗，用户那边相关箱体的轨迹记录 两边应该可以用一个组件
 // 定义接口来定义对象的类型
 interface TableData {
 	id: number;
@@ -133,6 +136,7 @@ interface TableDataState {
 defineOptions({ name: 'apiV1SystemBoxList' });
 const addBoxRef = ref();
 // const editBoxRef = ref(); // 暂时注释掉
+const locationMapRef = ref();
 const state = reactive<TableDataState>({
 	ids: [],
 	tableData: {
@@ -285,33 +289,13 @@ const onOpenEditBox = (row: Object) => {
 };
 // 获取当前定位
 const onGetLocation = (row: any) => {
-	// getBoxLocation(row.id).then(res => {
-	//   ElMessage.success(`箱体${row.boxId}当前位置：${res.data.location || '位置获取中...'}`);
-	// }).catch(() => {
-	//   ElMessage.error('获取位置失败');
-	// });
-
-	// 模拟定位数据
-	const mockLocations = [
-		'北京市朝阳区建国路88号',
-		'上海市浦东新区陆家嘴环路1000号',
-		'广州市天河区珠江新城花城大道85号',
-		'深圳市南山区科技园南区深南大道9988号',
-	];
-	const randomLocation = mockLocations[Math.floor(Math.random() * mockLocations.length)];
-	ElMessage.success(`箱体${row.boxId}当前位置：${randomLocation}`);
+	// 直接打开定位地图弹窗
+	locationMapRef.value?.openDialog(row.boxId);
 };
 // 查看轨迹记录
 const onGetTrajectory = (row: any) => {
-	// getBoxTrajectory(row.id).then(res => {
-	//   ElMessage.success('轨迹记录已加载');
-	//   // 这里可以打开轨迹记录弹窗或跳转到轨迹页面
-	// }).catch(() => {
-	//   ElMessage.error('获取轨迹记录失败');
-	// });
-
-	// 模拟轨迹数据
-	ElMessage.success(`箱体${row.boxId}轨迹记录已加载，共记录${Math.floor(Math.random() * 50 + 10)}个位置点`);
+	// 打开轨迹地图弹窗，自动播放轨迹
+	locationMapRef.value?.openDialog(row.boxId, 'track');
 };
 // 激活箱体
 const onActivateBox = (row: any) => {
