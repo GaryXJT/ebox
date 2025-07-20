@@ -685,7 +685,8 @@ const generateMockTrackData = (centerPoint: LocationData): any[] => {
 
 		points.push(point);
 	}
-
+	console.log(11111111111111111);
+	console.log(points);
 	return points;
 };
 
