@@ -60,7 +60,7 @@
       </template>
 
       <el-dialog
-          :visible.sync="popoverVisible"
+          v-model:visible="popoverVisible"
           :close-on-click-modal="false"
           append-to-body
           :center="true"

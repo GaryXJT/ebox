@@ -172,7 +172,7 @@ import {defineComponent, getCurrentInstance, inject, onMounted, reactive, ref, u
 import type { FormInstance, FormRules } from 'element-plus';
 import { TableDataInfo } from '/@/views/system/tools/gen/component/model';
 import {ElMessage} from "element-plus";
-import {Ref, UnwrapRef} from "@vue/reactivity";
+import {Ref, UnwrapRef} from "vue";
 import {getMenuParams} from "/@/api/system/menu";
 defineOptions({ name: "genInfoForm"})
 const emit = defineEmits(['goNext','close']);

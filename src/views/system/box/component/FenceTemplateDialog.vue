@@ -3,7 +3,7 @@
 		:model-value="visible"
 		@update:model-value="$emit('update:visible', $event)"
 		title="电子围栏模板管理"
-		width="1200px"
+		width="1600px"
 		:close-on-click-modal="false"
 		destroy-on-close
 	>
@@ -21,83 +21,150 @@
 					</div>
 				</div>
 				<div class="map-right">
-					<!-- 当前围栏信息区域 -->
-					<div class="drawing-info" v-if="currentDrawing.coordinates.length > 0">
-						<h4 class="section-title">
-							<el-icon><LocationFilled /></el-icon>
-							当前围栏信息
-						</h4>
-						<el-form :model="currentDrawing" label-width="80px" size="small">
-							<el-form-item label="围栏类型">
-								<el-tag :type="getTypeColor(currentDrawing.type)">
-									{{ getTypeName(currentDrawing.type) }}
-								</el-tag>
-							</el-form-item>
-							<el-form-item label="坐标点数">
-								<span>{{ currentDrawing.coordinates.length }} 个点</span>
-							</el-form-item>
-							<el-form-item label="围栏面积" v-if="currentDrawing.area">
-								<span>{{ currentDrawing.area }} 平方米</span>
-							</el-form-item>
-							<el-form-item label="围栏周长" v-if="currentDrawing.perimeter">
-								<span>{{ currentDrawing.perimeter }} 米</span>
-							</el-form-item>
-						</el-form>
-						<div class="drawing-actions">
-							<el-button size="small" @click="clearCurrentDrawing">
-								<el-icon><Delete /></el-icon>
-								清除围栏
-							</el-button>
-							<el-button type="primary" size="small" @click="showSaveDialog">
-								<el-icon><DocumentAdd /></el-icon>
-								保存模板
-							</el-button>
-						</div>
-					</div>
-
-					<!-- 绘图说明 -->
-					<div class="drawing-tips" v-else>
-						<h4 class="section-title">
-							<el-icon><Edit /></el-icon>
-							绘图说明
-						</h4>
-						<div class="tips-content">
-							<p><strong>操作说明：</strong></p>
-							<ul>
-								<li><strong>折线围栏：</strong>点击地图添加点，双击完成绘制</li>
-								<li><strong>多边形围栏：</strong>点击地图添加顶点，双击闭合多边形</li>
-								<li><strong>圆形围栏：</strong>点击设置圆心，再点击设置半径</li>
-								<li><strong>矩形围栏：</strong>点击设置起始点，再点击设置对角点</li>
-								<li><strong>取消绘制：</strong>右键或按ESC键取消当前绘制</li>
-							</ul>
-							<el-alert title="请在地图上选择绘图工具开始绘制围栏" type="info" :closable="false" />
-						</div>
-					</div>
-
-					<!-- 已保存模板列表 -->
-					<div class="template-list">
-						<h4 class="section-title">
-							<el-icon><FolderOpened /></el-icon>
-							围栏模板
-							<span class="template-count">({{ savedTemplates.length }})</span>
-						</h4>
-						<div class="template-items" v-if="savedTemplates.length > 0">
-							<div v-for="template in savedTemplates" :key="template.id" class="template-item" @click="loadTemplate(template)">
-								<div class="template-header">
-									<span class="template-name">{{ template.name }}</span>
-									<el-tag size="small" :type="getTypeColor(template.type)">
-										{{ getTypeName(template.type) }}
-									</el-tag>
-								</div>
-								<div class="template-meta">
-									<span class="template-time">{{ template.createTime }}</span>
-									<el-button type="danger" link size="small" @click.stop="deleteTemplate(template.id)">
+					<div class="right-content">
+						<!-- 左侧：地图工具区域 -->
+						<div class="tools-section">
+							<!-- 当前围栏信息区域 -->
+							<div class="drawing-info" v-if="currentDrawing.coordinates.length > 0">
+								<h4 class="section-title">
+									<el-icon><LocationFilled /></el-icon>
+									当前围栏信息
+								</h4>
+								<el-form :model="currentDrawing" label-width="80px" size="small">
+									<el-form-item label="围栏类型">
+										<el-tag :type="getTypeColor(currentDrawing.type)">
+											{{ getTypeName(currentDrawing.type) }}
+										</el-tag>
+									</el-form-item>
+									<el-form-item label="坐标点数">
+										<span>{{ currentDrawing.coordinates.length }} 个点</span>
+									</el-form-item>
+									<el-form-item label="围栏面积" v-if="currentDrawing.area">
+										<span>{{ currentDrawing.area }} 平方米</span>
+									</el-form-item>
+									<el-form-item label="围栏周长" v-if="currentDrawing.perimeter">
+										<span>{{ currentDrawing.perimeter }} 米</span>
+									</el-form-item>
+								</el-form>
+								<div class="drawing-actions">
+									<el-button size="small" @click="clearCurrentDrawing">
 										<el-icon><Delete /></el-icon>
+										清除围栏
 									</el-button>
 								</div>
 							</div>
+
+							<!-- 所有围栏列表 -->
+							<div class="all-fences-info" v-if="allFences.length > 0 || currentDrawing.coordinates.length > 0">
+								<h4 class="section-title">
+									<el-icon><LocationFilled /></el-icon>
+									地图围栏
+									<span class="fence-count">({{ allFences.length + (currentDrawing.coordinates.length > 0 ? 1 : 0) }})</span>
+								</h4>
+								<div class="fence-list">
+									<!-- 已完成的围栏 -->
+									<div
+										v-for="(fence, index) in allFences"
+										:key="index"
+										class="fence-item completed"
+										:class="{ highlight: highlightIndex === index }"
+										@mouseenter="highlightFence(index)"
+										@mouseleave="unhighlightFence()"
+										@click="focusOnFence(index)"
+									>
+										<div class="fence-header">
+											<el-tag size="small" :type="getTypeColor(fence.type)"> 围栏{{ index + 1 }} - {{ getTypeName(fence.type) }} </el-tag>
+											<div class="fence-actions">
+												<el-button type="primary" link size="small" @click.stop="focusOnFence(index)" title="定位到此围栏">
+													<el-icon><Position /></el-icon>
+												</el-button>
+												<el-button type="danger" link size="small" @click.stop="removeFence(index)">
+													<el-icon><Delete /></el-icon>
+												</el-button>
+											</div>
+										</div>
+										<div class="fence-details">
+											<span v-if="fence.area > 0" class="detail-item">面积: {{ fence.area }}㎡</span>
+											<span v-if="fence.perimeter > 0" class="detail-item">周长: {{ fence.perimeter }}m</span>
+											<span class="detail-item">点数: {{ fence.coordinates.length }}</span>
+										</div>
+									</div>
+									<!-- 当前绘制中的围栏 -->
+									<div v-if="currentDrawing.coordinates.length > 0" class="fence-item drawing">
+										<div class="fence-header">
+											<el-tag size="small" :type="getTypeColor(currentDrawing.type)" effect="plain">
+												{{ getTypeName(currentDrawing.type) }}(绘制中)
+											</el-tag>
+										</div>
+										<div class="fence-details">
+											<span v-if="currentDrawing.area > 0" class="detail-item">面积: {{ currentDrawing.area }}㎡</span>
+											<span v-if="currentDrawing.perimeter > 0" class="detail-item">周长: {{ currentDrawing.perimeter }}m</span>
+											<span class="detail-item">点数: {{ currentDrawing.coordinates.length }}</span>
+										</div>
+									</div>
+								</div>
+								<div class="all-fences-actions">
+									<el-button
+										type="primary"
+										size="small"
+										@click="showSaveDialog"
+										:disabled="allFences.length === 0 && currentDrawing.coordinates.length === 0"
+									>
+										<el-icon><DocumentAdd /></el-icon>
+										保存为模板
+									</el-button>
+								</div>
+							</div>
+
+							<!-- 绘图说明 -->
+							<div class="drawing-tips" v-else>
+								<h4 class="section-title">
+									<el-icon><Edit /></el-icon>
+									绘图说明
+								</h4>
+								<div class="tips-content">
+									<p><strong>操作说明：</strong></p>
+									<ul>
+										<li><strong>折线围栏：</strong>点击地图添加点，双击完成绘制</li>
+										<li><strong>多边形围栏：</strong>点击地图添加顶点，双击闭合多边形</li>
+										<li><strong>圆形围栏：</strong>点击设置圆心，再点击设置半径</li>
+										<li><strong>矩形围栏：</strong>点击设置起始点，再点击设置对角点</li>
+										<li><strong>取消绘制：</strong>右键或按ESC键取消当前绘制</li>
+									</ul>
+									<el-alert title="请在地图上选择绘图工具开始绘制围栏" type="info" :closable="false" />
+								</div>
+							</div>
 						</div>
-						<el-empty v-else description="暂无保存的模板" :image-size="60" />
+
+						<!-- 右侧：模板管理区域 -->
+						<div class="template-section">
+							<!-- 已保存模板列表 -->
+							<div class="template-list">
+								<h4 class="section-title">
+									<el-icon><FolderOpened /></el-icon>
+									围栏模板
+									<span class="template-count">({{ savedTemplates.length }})</span>
+								</h4>
+								<div class="template-items" v-if="savedTemplates.length > 0">
+									<div v-for="template in savedTemplates" :key="template.id" class="template-item" @click="loadTemplate(template)">
+										<div class="template-header">
+											<span class="template-name">{{ template.name }}</span>
+											<el-tag size="small" type="info"> {{ template.fences.length }} 个围栏 </el-tag>
+										</div>
+										<div class="template-meta">
+											<span class="template-time">{{ template.createTime }}</span>
+											<el-button type="danger" link size="small" @click.stop="deleteTemplate(template.id)">
+												<el-icon><Delete /></el-icon>
+											</el-button>
+										</div>
+										<div class="template-desc" v-if="template.description">
+											<span class="desc-text">{{ template.description }}</span>
+										</div>
+									</div>
+								</div>
+								<el-empty v-else description="暂无保存的模板" :image-size="60" />
+							</div>
+						</div>
 					</div>
 				</div>
 			</div>
@@ -115,10 +182,13 @@
 				<el-form-item label="模板名称：" prop="name">
 					<el-input v-model="saveDialog.name" placeholder="请输入模板名称" maxlength="50" show-word-limit clearable />
 				</el-form-item>
-				<el-form-item label="模板类型：">
-					<el-tag :type="getTypeColor(saveDialog.type)">
-						{{ getTypeName(saveDialog.type) }}
-					</el-tag>
+				<el-form-item label="包含围栏：">
+					<div class="fence-summary">
+						<el-tag size="small" type="info"> {{ allFences.length + (currentDrawing.coordinates.length > 0 ? 1 : 0) }} 个围栏 </el-tag>
+						<span class="fence-types">
+							{{ getFenceTypesSummary() }}
+						</span>
+					</div>
 				</el-form-item>
 				<el-form-item label="模板描述：">
 					<el-input v-model="saveDialog.description" type="textarea" :rows="3" placeholder="请输入模板描述（可选）" maxlength="200" show-word-limit />
@@ -137,7 +207,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, watch, nextTick, onUnmounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { Loading, LocationFilled, Edit, FolderOpened, DocumentAdd, Delete } from '@element-plus/icons-vue';
+import { Loading, LocationFilled, Edit, FolderOpened, DocumentAdd, Delete, Position } from '@element-plus/icons-vue';
 
 // 组件属性
 interface Props {
@@ -146,7 +216,7 @@ interface Props {
 
 const props = defineProps<Props>();
 const emit = defineEmits(['update:visible']);
-
+//todo xjt:点击模板之后应该出现模板对应的围栏，而不是直接增加 切换现在逻辑有问题 而且应该显示模板id以确认是否是新增的
 // 响应式数据
 const mapContainer = ref<HTMLElement>();
 const saveFormRef = ref();
@@ -154,6 +224,10 @@ const mapLoading = ref(true);
 const loadError = ref(false);
 let map: any = null;
 let currentTool: any = null;
+
+// 高亮相关状态
+const highlightIndex = ref<number>(-1);
+const originalStyles = ref<Map<number, any>>(new Map());
 
 // 绘图数据
 const currentDrawing = reactive({
@@ -174,22 +248,46 @@ const saveDialog = reactive({
 });
 
 // 已保存的模板
-const savedTemplates = ref<any[]>([
+const savedTemplates = ref<FenceTemplate[]>([
 	{
 		id: '1',
 		name: '办公区域围栏',
-		type: 'polygon',
-		coordinates: [],
-		createTime: '2024-01-15 10:30:00',
 		description: '办公楼周边区域',
+		createTime: '2024-01-15 10:30:00',
+		mapCenter: { lng: 116.403874, lat: 39.915661 },
+		mapZoom: 12,
+		fences: [
+			{
+				type: 'polygon',
+				coordinates: [
+					{ lng: 116.4, lat: 39.91 },
+					{ lng: 116.41, lat: 39.91 },
+					{ lng: 116.41, lat: 39.92 },
+					{ lng: 116.4, lat: 39.92 },
+				],
+				area: 120000,
+				perimeter: 1400,
+			},
+		],
 	},
 	{
 		id: '2',
 		name: '停车场围栏',
-		type: 'rectangle',
-		coordinates: [],
-		createTime: '2024-01-14 16:20:00',
 		description: '员工停车区域',
+		createTime: '2024-01-14 16:20:00',
+		mapCenter: { lng: 116.403874, lat: 39.915661 },
+		mapZoom: 15,
+		fences: [
+			{
+				type: 'rectangle',
+				coordinates: [
+					{ lng: 116.4, lat: 39.91 },
+					{ lng: 116.405, lat: 39.915 },
+				],
+				area: 31000,
+				perimeter: 700,
+			},
+		],
 	},
 ]);
 
@@ -402,7 +500,8 @@ const createDrawingTools = () => {
 		{ type: 'polygon', title: '多边形围栏', icon: '🔶' },
 		{ type: 'circle', title: '圆形围栏', icon: '⭕' },
 		{ type: 'rectangle', title: '矩形围栏', icon: '⬛' },
-		{ type: 'clear', title: '清除', icon: '🗑️' },
+		{ type: 'interrupt', title: '中断绘图', icon: '⏹️' },
+		{ type: 'clear', title: '清除所有', icon: '🗑️' },
 	];
 
 	tools.forEach((tool) => {
@@ -442,6 +541,8 @@ const createDrawingTools = () => {
 
 			if (tool.type === 'clear') {
 				clearAllDrawings();
+			} else if (tool.type === 'interrupt') {
+				interruptCurrentDrawing();
 			} else {
 				activateDrawingTool(tool.type, button);
 			}
@@ -556,8 +657,8 @@ const activateDrawingTool = (type: string, button: HTMLElement) => {
 // 处理折线绘制完成
 const handlePolylineDrawComplete = (e: any) => {
 	try {
-		const coordinates = e.currentLnglats || [];
-		const distance = e.currentDistance || 0;
+		const coordinates = e.currentLnglats || []; //所有点的坐标
+		const distance = e.currentDistance || 0; //总长度
 		const overlay = e.currentPolyline;
 
 		// 更新当前绘制信息
@@ -568,6 +669,10 @@ const handlePolylineDrawComplete = (e: any) => {
 			perimeter: Math.round(distance),
 			overlay,
 		});
+		// console.log(12312321312);
+		// console.log(coordinates);
+		// console.log(distance);
+		// console.log(overlay);
 
 		finishDrawing('polyline');
 	} catch (error) {
@@ -576,11 +681,35 @@ const handlePolylineDrawComplete = (e: any) => {
 	}
 };
 
+//todo:多边形删除
+// 保存模板的数据结构
+interface FenceTemplate {
+	id: string;
+	name: string;
+	description: string;
+	createTime: string;
+	mapCenter: { lng: number; lat: number }; // 地图中心点
+	mapZoom: number; // 地图缩放级别
+	fences: Array<{
+		type: 'polyline' | 'polygon' | 'circle' | 'rectangle';
+		coordinates: any[];
+		area?: number;
+		perimeter?: number;
+		style?: any; // 图形样式属性
+	}>; // 所有围栏图形
+}
+
+// 当前地图上的所有围栏
+const allFences = ref<any[]>([]);
+
 // 处理多边形绘制完成
 const handlePolygonDrawComplete = (e: any) => {
 	try {
 		const coordinates = e.currentLnglats || [];
 		const overlay = e.currentPolygon;
+		console.log(12312321312);
+		console.log(coordinates);
+		console.log(overlay);
 
 		// 计算面积和周长
 		let area = 0;
@@ -673,6 +802,18 @@ const handleRectangleDrawComplete = (e: any) => {
 
 // 完成绘制的通用处理
 const finishDrawing = (type: string) => {
+	// 将当前绘制的围栏添加到所有围栏列表中
+	if (currentDrawing.overlay && currentDrawing.coordinates.length > 0) {
+		allFences.value.push({
+			type: currentDrawing.type,
+			coordinates: [...currentDrawing.coordinates],
+			area: currentDrawing.area,
+			perimeter: currentDrawing.perimeter,
+			overlay: currentDrawing.overlay,
+			style: getFenceStyle(currentDrawing.type),
+		});
+	}
+
 	// 恢复默认鼠标样式
 	if (mapContainer.value) {
 		mapContainer.value.style.cursor = 'default';
@@ -688,7 +829,86 @@ const finishDrawing = (type: string) => {
 		(btn as HTMLElement).style.backgroundColor = 'white';
 	});
 
+	// 重置当前绘制信息（但不清除地图上的图形）
+	Object.assign(currentDrawing, {
+		type: '',
+		coordinates: [],
+		area: 0,
+		perimeter: 0,
+		overlay: null,
+	});
+
 	ElMessage.success(`${getTypeName(type)}绘制完成`);
+};
+
+// 中断当前绘图
+const interruptCurrentDrawing = () => {
+	// 清除当前未完成的绘制
+	if (currentDrawing.overlay) {
+		map.removeOverLay(currentDrawing.overlay);
+	}
+
+	// 关闭当前工具
+	if (currentTool) {
+		currentTool.close();
+		currentTool = null;
+	}
+
+	// 清除自定义绘制模式
+	clearCustomDrawMode();
+
+	// 重置当前绘制信息
+	Object.assign(currentDrawing, {
+		type: '',
+		coordinates: [],
+		area: 0,
+		perimeter: 0,
+		overlay: null,
+	});
+
+	// 重置工具栏状态
+	document.querySelectorAll('.drawing-tools-container button').forEach((btn) => {
+		btn.classList.remove('active');
+		(btn as HTMLElement).style.borderColor = '#d9d9d9';
+		(btn as HTMLElement).style.backgroundColor = 'white';
+	});
+
+	// 恢复默认鼠标样式
+	if (mapContainer.value) {
+		mapContainer.value.style.cursor = 'default';
+	}
+
+	ElMessage.info('已中断当前绘图');
+};
+
+// 获取围栏样式
+const getFenceStyle = (type: string) => {
+	const styleMap = {
+		polyline: { color: '#1890ff', weight: 2, opacity: 0.8 },
+		polygon: { fillColor: '#52c41a', fillOpacity: 0.3, color: '#52c41a', weight: 2, opacity: 0.8 },
+		circle: { color: '#52c41a', weight: 2, opacity: 0.8, fillColor: '#52c41a', fillOpacity: 0.3 },
+		rectangle: { color: '#722ed1', weight: 2, opacity: 0.8, fillColor: '#722ed1', fillOpacity: 0.3 },
+	};
+	return styleMap[type as keyof typeof styleMap] || {};
+};
+
+// 获取围栏类型汇总
+const getFenceTypesSummary = () => {
+	const types: string[] = [];
+
+	// 统计已完成的围栏类型
+	allFences.value.forEach((fence) => {
+		if (!types.includes(fence.type)) {
+			types.push(fence.type);
+		}
+	});
+
+	// 添加当前绘制中的围栏类型
+	if (currentDrawing.type && !types.includes(currentDrawing.type)) {
+		types.push(currentDrawing.type);
+	}
+
+	return types.map((type) => getTypeName(type)).join('、') || '无';
 };
 
 // 取消当前工具
@@ -777,27 +997,118 @@ const calculatePolygonPerimeter = (coordinates: any[]): number => {
 };
 
 // 清除所有绘制
-const clearAllDrawings = () => {
-	// 清除当前绘制的内容
-	clearCurrentDrawing();
+const clearAllDrawings = async () => {
+	try {
+		// 计算要清除的围栏总数
+		const totalFences = allFences.value.length + (currentDrawing.coordinates.length > 0 ? 1 : 0);
 
-	// 关闭当前工具
-	if (currentTool) {
-		currentTool.close();
-		currentTool = null;
+		if (totalFences === 0) {
+			ElMessage.info('当前没有围栏需要清除');
+			return;
+		}
+
+		// 倒计时确认弹窗
+		await showCountdownConfirm(`确定要清除所有围栏吗？（共 ${totalFences} 个围栏）`, '警告', 5);
+
+		// 清除高亮状态
+		highlightIndex.value = -1;
+		originalStyles.value.clear();
+
+		// 清除当前绘制的内容
+		clearCurrentDrawing();
+
+		// 清除所有已绘制的围栏
+		allFences.value.forEach((fence) => {
+			if (fence.overlay) {
+				map.removeOverLay(fence.overlay);
+			}
+		});
+		allFences.value = [];
+
+		// 关闭当前工具
+		if (currentTool) {
+			currentTool.close();
+			currentTool = null;
+		}
+
+		// 清除自定义绘制模式
+		clearCustomDrawMode();
+
+		// 重置工具按钮状态
+		document.querySelectorAll('.drawing-tools-container button').forEach((btn) => {
+			btn.classList.remove('active');
+			(btn as HTMLElement).style.borderColor = '#d9d9d9';
+			(btn as HTMLElement).style.backgroundColor = 'white';
+		});
+
+		ElMessage.success(`已清除所有绘制内容（${totalFences} 个围栏）`);
+	} catch (error) {
+		// 用户取消或倒计时结束
+		ElMessage.info('已取消清除操作');
 	}
+};
 
-	// 清除自定义绘制模式
-	clearCustomDrawMode();
+// 倒计时确认弹窗
+const showCountdownConfirm = (message: string, title: string, countdown: number): Promise<void> => {
+	return new Promise((resolve, reject) => {
+		let timeLeft = countdown;
+		let timer: NodeJS.Timeout | null = null;
 
-	// 重置工具按钮状态
-	document.querySelectorAll('.drawing-tools-container button').forEach((btn) => {
-		btn.classList.remove('active');
-		(btn as HTMLElement).style.borderColor = '#d9d9d9';
-		(btn as HTMLElement).style.backgroundColor = 'white';
+		const updateMessage = () => {
+			return `${message}\n\n⏰ ${timeLeft} 秒后自动取消...`;
+		};
+
+		// 显示弹窗
+		const showDialog = () => {
+			ElMessageBox.confirm(updateMessage(), title, {
+				type: 'warning',
+				confirmButtonText: `确定清除 (${timeLeft}s)`,
+				cancelButtonText: '取消',
+				dangerouslyUseHTMLString: false,
+				distinguishCancelAndClose: true,
+				closeOnClickModal: false,
+				closeOnPressEscape: true,
+				center: true,
+			})
+				.then(() => {
+					// 用户点击确定
+					if (timer) clearInterval(timer);
+					resolve();
+				})
+				.catch((action) => {
+					// 用户取消或关闭
+					if (timer) clearInterval(timer);
+					reject();
+				});
+		};
+
+		// 启动倒计时
+		timer = setInterval(() => {
+			timeLeft--;
+
+			// 更新按钮文本
+			const confirmBtn = document.querySelector('.el-message-box__btns .el-button--primary span');
+			if (confirmBtn) {
+				confirmBtn.textContent = `确定清除 (${timeLeft}s)`;
+			}
+
+			// 更新消息内容
+			const messageElement = document.querySelector('.el-message-box__message');
+			if (messageElement) {
+				messageElement.textContent = updateMessage();
+			}
+
+			if (timeLeft <= 0) {
+				// 倒计时结束，自动关闭
+				clearInterval(timer!);
+				ElMessageBox.close();
+				reject();
+			}
+		}, 1000);
+
+		// 显示弹窗
+		showDialog();
 	});
-
-	ElMessage.success('已清除所有绘制内容');
 };
 
 // 清除当前绘制
@@ -819,17 +1130,38 @@ const clearCurrentDrawing = () => {
 
 // 显示保存对话框
 const showSaveDialog = () => {
-	if (currentDrawing.coordinates.length === 0) {
+	if (allFences.value.length === 0 && currentDrawing.coordinates.length === 0) {
 		ElMessage.warning('请先绘制围栏');
 		return;
+	}
+
+	// 如果当前正在绘制中，先完成当前绘制
+	if (currentDrawing.coordinates.length > 0 && currentDrawing.overlay) {
+		allFences.value.push({
+			type: currentDrawing.type,
+			coordinates: [...currentDrawing.coordinates],
+			area: currentDrawing.area,
+			perimeter: currentDrawing.perimeter,
+			overlay: currentDrawing.overlay,
+			style: getFenceStyle(currentDrawing.type),
+		});
+
+		// 重置当前绘制信息
+		Object.assign(currentDrawing, {
+			type: '',
+			coordinates: [],
+			area: 0,
+			perimeter: 0,
+			overlay: null,
+		});
 	}
 
 	Object.assign(saveDialog, {
 		visible: true,
 		name: '',
-		type: currentDrawing.type,
+		type: '', // 清空类型字段
 		description: '',
-		coordinates: [...currentDrawing.coordinates],
+		coordinates: [], // 不再使用，改为allFences
 	});
 };
 
@@ -838,22 +1170,99 @@ const confirmSave = async () => {
 	try {
 		await saveFormRef.value?.validate();
 
-		const newTemplate = {
+		// 获取当前地图状态
+		const mapCenter = map.getCenter();
+		const mapZoom = map.getZoom();
+
+		// 如果当前正在绘制中，先完成当前绘制
+		if (currentDrawing.coordinates.length > 0 && currentDrawing.overlay) {
+			allFences.value.push({
+				type: currentDrawing.type,
+				coordinates: [...currentDrawing.coordinates],
+				area: currentDrawing.area,
+				perimeter: currentDrawing.perimeter,
+				overlay: currentDrawing.overlay,
+				style: getFenceStyle(currentDrawing.type),
+			});
+
+			// 重置当前绘制信息
+			Object.assign(currentDrawing, {
+				type: '',
+				coordinates: [],
+				area: 0,
+				perimeter: 0,
+				overlay: null,
+			});
+		}
+
+		// 准备围栏数据
+		const fences = allFences.value.map((fence) => ({
+			type: fence.type,
+			coordinates: fence.coordinates,
+			area: fence.area,
+			perimeter: fence.perimeter,
+			style: fence.style,
+		}));
+
+		// 要发给后端的数据
+		const backendData = {
+			name: saveDialog.name,
+			description: saveDialog.description,
+			mapCenter: { lng: mapCenter.lng, lat: mapCenter.lat },
+			mapZoom: mapZoom,
+			fences: fences,
+			// 额外的元数据
+			metadata: {
+				totalFences: fences.length,
+				fenceTypes: [...new Set(fences.map((f) => f.type))],
+				totalArea: fences.reduce((sum, f) => sum + (f.area || 0), 0),
+				totalPerimeter: fences.reduce((sum, f) => sum + (f.perimeter || 0), 0),
+				createTime: new Date().toISOString(),
+				version: '1.0',
+			},
+		};
+
+		// 打印要发给后端的数据
+		console.log('===== 围栏模板数据 - 发送给后端 =====');
+		console.log('🎯 完整数据结构:', backendData);
+		console.log('📍 地图中心点:', backendData.mapCenter);
+		console.log('🔍 地图缩放级别:', backendData.mapZoom);
+		console.log('🏗️ 围栏数量:', backendData.fences.length);
+		console.log('📊 围栏统计:', backendData.metadata);
+		console.log('🎨 围栏详情:');
+		backendData.fences.forEach((fence, index) => {
+			console.log(`  围栏 ${index + 1}:`, {
+				类型: fence.type,
+				坐标点数: fence.coordinates.length,
+				面积: fence.area + '㎡',
+				周长: fence.perimeter + 'm',
+				坐标: fence.coordinates,
+			});
+		});
+		console.log('===== 数据打印完成 =====');
+
+		// JSON格式化打印（方便复制）
+		console.log('🔄 JSON格式（用于API调用）:');
+		console.log(JSON.stringify(backendData, null, 2));
+
+		const newTemplate: FenceTemplate = {
 			id: Date.now().toString(),
 			name: saveDialog.name,
-			type: saveDialog.type,
-			coordinates: saveDialog.coordinates,
-			createTime: new Date().toLocaleString(),
 			description: saveDialog.description,
+			createTime: new Date().toLocaleString(),
+			mapCenter: { lng: mapCenter.lng, lat: mapCenter.lat },
+			mapZoom: mapZoom,
+			fences: fences,
 		};
 
 		savedTemplates.value.unshift(newTemplate);
 
-		ElMessage.success('模板保存成功');
+		ElMessage.success(`模板保存成功，包含 ${fences.length} 个围栏`);
 		cancelSave();
-		clearCurrentDrawing();
+		// 不再清除当前绘制，因为已经保存了所有内容
 	} catch (error) {
 		console.error('保存失败:', error);
+		ElMessage.error('保存失败');
 	}
 };
 
@@ -869,9 +1278,83 @@ const cancelSave = () => {
 };
 
 // 加载模板
-const loadTemplate = (template: any) => {
-	ElMessage.info(`加载模板: ${template.name}`);
-	// 这里可以实现模板加载到地图的逻辑
+const loadTemplate = (template: FenceTemplate) => {
+	try {
+		// 清除高亮状态
+		highlightIndex.value = -1;
+		originalStyles.value.clear();
+
+		// 清除当前所有围栏
+		clearAllDrawings();
+
+		// 定位到保存时的地图状态
+		if (template.mapCenter && template.mapZoom) {
+			const T = (window as any).T;
+			const center = new T.LngLat(template.mapCenter.lng, template.mapCenter.lat);
+			map.centerAndZoom(center, template.mapZoom);
+		}
+
+		// 重新绘制所有围栏
+		if (template.fences && template.fences.length > 0) {
+			template.fences.forEach((fence, index) => {
+				let overlay: any = null;
+				const T = (window as any).T;
+
+				switch (fence.type) {
+					case 'polyline':
+						const polylinePoints = fence.coordinates.map((coord: any) => new T.LngLat(coord.lng, coord.lat));
+						overlay = new T.Polyline(polylinePoints, fence.style || getFenceStyle('polyline'));
+						break;
+
+					case 'polygon':
+						const polygonPoints = fence.coordinates.map((coord: any) => new T.LngLat(coord.lng, coord.lat));
+						overlay = new T.Polygon(polygonPoints, fence.style || getFenceStyle('polygon'));
+						break;
+
+					case 'circle':
+						if (fence.coordinates.length > 0) {
+							const centerPoint = fence.coordinates[0];
+							const center = new T.LngLat(centerPoint.lng, centerPoint.lat);
+							const radius = centerPoint.radius || 100;
+							overlay = new T.Circle(center, radius, fence.style || getFenceStyle('circle'));
+						}
+						break;
+
+					case 'rectangle':
+						if (fence.coordinates.length >= 2) {
+							const point1 = fence.coordinates[0];
+							const point2 = fence.coordinates[1];
+							const sw = new T.LngLat(point1.lng, point1.lat);
+							const ne = new T.LngLat(point2.lng, point2.lat);
+							const nw = new T.LngLat(sw.lng, ne.lat);
+							const se = new T.LngLat(ne.lng, sw.lat);
+							const points = [sw, nw, ne, se, sw];
+							overlay = new T.Polygon(points, fence.style || getFenceStyle('rectangle'));
+						}
+						break;
+				}
+
+				if (overlay) {
+					map.addOverLay(overlay);
+					allFences.value.push({
+						type: fence.type,
+						coordinates: fence.coordinates,
+						area: fence.area || 0,
+						perimeter: fence.perimeter || 0,
+						overlay: overlay,
+						style: fence.style,
+					});
+				}
+			});
+
+			ElMessage.success(`模板加载成功，已加载 ${template.fences.length} 个围栏`);
+		} else {
+			ElMessage.info(`加载模板: ${template.name}（无围栏数据）`);
+		}
+	} catch (error) {
+		console.error('加载模板失败:', error);
+		ElMessage.error('模板加载失败');
+	}
 };
 
 // 删除模板
@@ -886,6 +1369,45 @@ const deleteTemplate = async (id: string) => {
 			savedTemplates.value.splice(index, 1);
 			ElMessage.success('模板删除成功');
 		}
+	} catch (error) {
+		// 用户取消删除
+	}
+};
+
+// 删除单个围栏
+const removeFence = async (index: number) => {
+	try {
+		await ElMessageBox.confirm('确定要删除此围栏吗？', '删除确认', {
+			type: 'warning',
+		});
+
+		const fence = allFences.value[index];
+		if (fence.overlay) {
+			map.removeOverLay(fence.overlay);
+		}
+
+		// 清理该围栏的高亮状态
+		if (highlightIndex.value === index) {
+			highlightIndex.value = -1;
+		} else if (highlightIndex.value > index) {
+			// 如果删除的围栏在当前高亮围栏之前，需要调整高亮索引
+			highlightIndex.value--;
+		}
+		originalStyles.value.delete(index);
+
+		// 重新映射originalStyles中大于删除索引的key
+		const newOriginalStyles = new Map();
+		originalStyles.value.forEach((value, key) => {
+			if (key < index) {
+				newOriginalStyles.set(key, value);
+			} else if (key > index) {
+				newOriginalStyles.set(key - 1, value);
+			}
+		});
+		originalStyles.value = newOriginalStyles;
+
+		allFences.value.splice(index, 1);
+		ElMessage.success('围栏删除成功');
 	} catch (error) {
 		// 用户取消删除
 	}
@@ -1009,6 +1531,8 @@ const handleCustomCircleClick = (e: any) => {
 		};
 
 		handleCircleDrawComplete(eventData);
+		// console.log(12312321312);
+		// console.log(eventData);
 		clearCustomDrawMode();
 	}
 };
@@ -1085,6 +1609,8 @@ const handleCustomRectangleClick = (e: any) => {
 		};
 
 		handleRectangleDrawComplete(eventData);
+		// console.log(12312321312);
+		// console.log(eventData);
 		clearCustomDrawMode();
 	}
 };
@@ -1163,11 +1689,122 @@ const clearCustomDrawMode = () => {
 	customDrawMode.value = '';
 	firstClickPoint.value = null;
 };
+
+// 高亮围栏
+const highlightFence = (index: number) => {
+	try {
+		const fence = allFences.value[index];
+		if (!fence || !fence.overlay) return;
+
+		highlightIndex.value = index;
+
+		// 保存原始样式（如果还没保存过）
+		if (!originalStyles.value.has(index)) {
+			const currentOptions = fence.overlay.getOptions();
+			originalStyles.value.set(index, { ...currentOptions });
+		}
+
+		// 应用高亮样式
+		const highlightOptions = {
+			color: '#409eff',
+			weight: 4,
+			opacity: 1,
+		};
+
+		// 如果是多边形或圆形，添加填充样式
+		if (fence.type === 'polygon' || fence.type === 'circle' || fence.type === 'rectangle') {
+			Object.assign(highlightOptions, {
+				fillColor: '#409eff',
+				fillOpacity: 0.4,
+			});
+		}
+
+		fence.overlay.setOptions(highlightOptions);
+	} catch (error) {
+		console.warn('高亮围栏失败:', error);
+	}
+};
+
+// 取消高亮
+const unhighlightFence = () => {
+	try {
+		const currentIndex = highlightIndex.value;
+		if (currentIndex === -1) return;
+
+		const fence = allFences.value[currentIndex];
+		if (fence && fence.overlay && originalStyles.value.has(currentIndex)) {
+			const originalOptions = originalStyles.value.get(currentIndex);
+			fence.overlay.setOptions(originalOptions);
+		}
+
+		highlightIndex.value = -1;
+	} catch (error) {
+		console.warn('取消高亮失败:', error);
+	}
+};
+
+// 聚焦到围栏
+const focusOnFence = (index: number) => {
+	try {
+		const fence = allFences.value[index];
+		if (!fence || !fence.overlay) {
+			ElMessage.warning('围栏数据无效');
+			return;
+		}
+
+		// 根据围栏类型计算中心点
+		let centerPoint;
+		const T = (window as any).T;
+
+		switch (fence.type) {
+			case 'circle':
+				// 圆形围栏已有中心点
+				if (fence.coordinates.length > 0) {
+					centerPoint = new T.LngLat(fence.coordinates[0].lng, fence.coordinates[0].lat);
+				}
+				break;
+			case 'rectangle':
+				// 矩形围栏计算中心点
+				if (fence.coordinates.length >= 2) {
+					const point1 = fence.coordinates[0];
+					const point2 = fence.coordinates[1];
+					const centerLng = (point1.lng + point2.lng) / 2;
+					const centerLat = (point1.lat + point2.lat) / 2;
+					centerPoint = new T.LngLat(centerLng, centerLat);
+				}
+				break;
+			case 'polygon':
+			case 'polyline':
+				// 多边形和折线计算质心
+				if (fence.coordinates.length > 0) {
+					let sumLng = 0,
+						sumLat = 0;
+					fence.coordinates.forEach((coord: any) => {
+						sumLng += coord.lng;
+						sumLat += coord.lat;
+					});
+					centerPoint = new T.LngLat(sumLng / fence.coordinates.length, sumLat / fence.coordinates.length);
+				}
+				break;
+		}
+
+		if (centerPoint) {
+			// 平滑移动到围栏中心并适当缩放
+			map.centerAndZoom(centerPoint, Math.max(map.getZoom(), 14));
+			ElMessage.success(`已定位到围栏${index + 1}`);
+		} else {
+			ElMessage.warning('无法定位到该围栏');
+		}
+	} catch (error) {
+		console.error('定位围栏失败:', error);
+		ElMessage.error('定位围栏失败');
+	}
+};
 </script>
 
 <style scoped lang="scss">
 .fence-template-container {
-	height: 600px;
+	height: 800px;
 
 	.map-content {
 		display: flex;
@@ -1206,11 +1843,33 @@ const clearCustomDrawMode = () => {
 		}
 
 		.map-right {
-			width: 320px;
+			width: 500px;
 			background: #fafafa;
 			border-left: 1px solid #e4e7ed;
 			padding: 16px;
 			overflow-y: auto;
+
+			.right-content {
+				display: flex;
+				gap: 16px;
+				height: 100%;
+			}
+
+			.tools-section {
+				flex: 1;
+				min-width: 0;
+				display: flex;
+				flex-direction: column;
+				gap: 16px;
+			}
+
+			.template-section {
+				width: 200px;
+				flex-shrink: 0;
+				display: flex;
+				flex-direction: column;
+				gap: 16px;
+			}
 
 			.section-title {
 				margin: 0 0 12px 0;
@@ -1279,13 +1938,112 @@ const clearCustomDrawMode = () => {
 				}
 			}
 
+			.all-fences-info {
+				margin-bottom: 24px;
+				padding: 16px;
+				background: white;
+				border-radius: 8px;
+				border: 1px solid #e4e7ed;
+
+				.fence-count {
+					font-weight: normal;
+					color: #909399;
+					font-size: 12px;
+				}
+
+				.fence-list {
+					margin-bottom: 16px;
+
+					.fence-item {
+						padding: 10px;
+						margin-bottom: 8px;
+						border-radius: 6px;
+						border: 1px solid #e4e7ed;
+						cursor: pointer;
+						transition: all 0.2s ease;
+						background: white;
+
+						&:hover {
+							border-color: #409eff;
+							box-shadow: 0 2px 8px rgba(64, 158, 255, 0.1);
+						}
+
+						&.completed {
+							background: white;
+						}
+
+						&.drawing {
+							background: #f0f9ff;
+							border-color: #409eff;
+						}
+
+						&.highlight {
+							border-color: #409eff;
+							background: #f0f9ff;
+							box-shadow: 0 4px 12px rgba(64, 158, 255, 0.2);
+							transform: translateY(-1px);
+						}
+
+						.fence-header {
+							display: flex;
+							align-items: center;
+							justify-content: space-between;
+							margin-bottom: 6px;
+
+							.el-tag {
+								font-size: 11px;
+								max-width: 180px;
+								overflow: hidden;
+								text-overflow: ellipsis;
+								white-space: nowrap;
+							}
+						}
+
+						.fence-actions {
+							display: flex;
+							gap: 2px;
+							align-items: center;
+
+							.el-button {
+								padding: 4px;
+								min-height: auto;
+
+								.el-icon {
+									font-size: 12px;
+								}
+							}
+						}
+
+						.fence-details {
+							display: flex;
+							gap: 8px;
+							flex-wrap: wrap;
+
+							.detail-item {
+								font-size: 11px;
+								color: #666;
+								background: #f5f5f5;
+								padding: 2px 6px;
+								border-radius: 3px;
+							}
+						}
+					}
+				}
+
+				.all-fences-actions {
+					.el-button {
+						width: 100%;
+					}
+				}
+			}
+
 			.template-list {
 				.template-items {
 					.template-item {
-						padding: 12px;
-						margin-bottom: 8px;
+						padding: 8px;
+						margin-bottom: 6px;
 						background: white;
-						border-radius: 6px;
+						border-radius: 4px;
 						border: 1px solid #e4e7ed;
 						cursor: pointer;
 						transition: all 0.2s;
@@ -1297,14 +2055,27 @@ const clearCustomDrawMode = () => {
 
 						.template-header {
 							display: flex;
-							align-items: center;
+							align-items: flex-start;
 							justify-content: space-between;
-							margin-bottom: 8px;
+							margin-bottom: 6px;
 
 							.template-name {
-								font-size: 13px;
+								font-size: 12px;
 								font-weight: 500;
 								color: #303133;
+								flex: 1;
+								overflow: hidden;
+								text-overflow: ellipsis;
+								white-space: nowrap;
+								margin-right: 4px;
+							}
+
+							.el-tag {
+								font-size: 10px;
+								padding: 0 4px;
+								height: 18px;
+								line-height: 18px;
+								flex-shrink: 0;
 							}
 						}
 
@@ -1314,8 +2085,37 @@ const clearCustomDrawMode = () => {
 							justify-content: space-between;
 
 							.template-time {
-								font-size: 11px;
+								font-size: 10px;
 								color: #909399;
+								overflow: hidden;
+								text-overflow: ellipsis;
+								white-space: nowrap;
+								flex: 1;
+							}
+
+							.el-button {
+								padding: 2px;
+								min-height: auto;
+
+								.el-icon {
+									font-size: 10px;
+								}
+							}
+						}
+
+						.template-desc {
+							margin-top: 4px;
+							padding-top: 4px;
+							border-top: 1px solid #f0f0f0;
+
+							.desc-text {
+								font-size: 10px;
+								color: #909399;
+								line-height: 1.3;
+								display: -webkit-box;
+								-webkit-line-clamp: 2;
+								-webkit-box-orient: vertical;
+								overflow: hidden;
 							}
 						}
 					}
@@ -1330,6 +2130,20 @@ const clearCustomDrawMode = () => {
 	.active {
 		border-color: #409eff !important;
 		background-color: #e6f7ff !important;
+	}
+}
+
+// 保存对话框样式
+:deep(.el-dialog__body) {
+	.fence-summary {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+
+		.fence-types {
+			font-size: 12px;
+			color: #666;
+		}
 	}
 }
 </style>
