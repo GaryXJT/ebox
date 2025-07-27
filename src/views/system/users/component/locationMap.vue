@@ -23,36 +23,120 @@
 				<div class="map-right">
 					<!-- 统一的状态和控制区域 -->
 					<div class="status-control-area">
-						<!-- 加载中状态 -->
-						<div v-if="mapLoading" class="map-status">
-							<el-alert title="地图加载中..." type="loading" show-icon :closable="false" />
-						</div>
-						<!-- 加载失败状态 -->
-						<div v-else-if="loadError" class="map-status">
-							<el-alert title="地图加载失败" type="error" description="可能的原因：网络连接问题 请刷新重试 " show-icon :closable="false" />
-						</div>
-						<!-- 轨迹模式加载成功 - 显示播放控制 -->
-						<div v-else-if="currentMode === 'track' && locationData && !mapLoading" class="track-controls">
-							<div class="track-info">
-								<el-tag :type="isTrackPlaying ? 'success' : 'info'" size="small">
-									{{ isTrackPlaying ? '轨迹播放中' : '轨迹已停止' }}
-								</el-tag>
-								<span class="track-progress">{{ trackProgress.current }}/{{ trackProgress.total }}</span>
+						<!-- 轨迹模式下的时间选择器和状态显示 -->
+						<div v-if="currentMode === 'track'" class="track-header">
+							<!-- 加载状态 -->
+							<div v-if="mapLoading || loadError" class="map-status">
+								<el-alert v-if="mapLoading" title="地图加载中..." type="info" :closable="false" effect="dark" class="loading-alert">
+									<template #icon>
+										<el-icon class="is-loading"><Loading /></el-icon>
+									</template>
+								</el-alert>
+								<el-alert
+									v-if="loadError"
+									title="地图加载失败"
+									type="error"
+									description="可能的原因：网络连接问题 请刷新重试"
+									show-icon
+									:closable="false"
+								/>
 							</div>
+
+							<!-- 时间筛选器 -->
+							<div v-show="!mapLoading && !loadError" class="time-filter">
+								<el-form-item label="开始时间">
+									<el-date-picker
+										v-model="timeFilter.startTime"
+										type="datetime"
+										placeholder="选择开始时间"
+										format="YYYY-MM-DD HH:mm:ss"
+										value-format="YYYY-MM-DD HH:mm:ss"
+										style="width: 100%"
+										@change="handleTimeChange"
+									/>
+								</el-form-item>
+								<el-form-item label="结束时间">
+									<el-date-picker
+										v-model="timeFilter.endTime"
+										type="datetime"
+										placeholder="选择结束时间"
+										format="YYYY-MM-DD HH:mm:ss"
+										value-format="YYYY-MM-DD HH:mm:ss"
+										style="width: 100%"
+										@change="handleTimeChange"
+									/>
+								</el-form-item>
+							</div>
+						</div>
+
+						<!-- 轨迹模式播放控制 -->
+						<div v-if="currentMode === 'track'" class="track-controls">
+							<div class="track-info">
+								<div class="point-details">
+									<div class="point-coordinates">
+										<template v-if="!mapLoading && currentPoint">
+											<span>经度: {{ currentPoint.lng.toFixed(6) }}</span>
+											<span>纬度: {{ currentPoint.lat.toFixed(6) }}</span>
+										</template>
+										<template v-else>
+											<span>经度: ---</span>
+											<span>纬度: ---</span>
+										</template>
+									</div>
+									<div class="point-time">
+										<template v-if="!mapLoading && currentPoint">
+											<span>时间: {{ currentPoint.time || '未知' }}</span>
+										</template>
+										<template v-else>
+											<span>时间: ---</span>
+										</template>
+									</div>
+								</div>
+								<div class="track-status">
+									<el-tag :type="isTrackPlaying ? 'success' : 'info'" size="small">
+										{{ isTrackPlaying ? '轨迹播放中' : '轨迹已停止' }}
+									</el-tag>
+									<span class="track-progress">当前点: {{ !mapLoading ? `${trackProgress.current + 1}/${trackProgress.total + 1}` : '---' }}</span>
+								</div>
+							</div>
+
+							<!-- 进度条 -->
+							<div class="progress-slider">
+								<el-slider
+									v-model="trackProgress.current"
+									:min="0"
+									:max="trackProgress.total"
+									:disabled="!trackProgress.total || mapLoading"
+									:show-tooltip="true"
+									:format-tooltip="formatProgressTooltip"
+									@change="handleProgressChange"
+								/>
+							</div>
+
 							<div class="control-buttons">
-								<el-button size="small" @click="pauseTrack" v-if="isTrackPlaying && !trackPaused" type="warning">
+								<el-button size="small" @click="startTrack" v-if="!isTrackPlaying" type="primary" :disabled="mapLoading">
+									<el-icon><VideoPlay /></el-icon>
+									开始播放
+								</el-button>
+								<el-button size="small" @click="pauseTrack" v-if="isTrackPlaying && !trackPaused" type="warning" :disabled="mapLoading">
 									<el-icon><VideoPause /></el-icon>
 									暂停
 								</el-button>
-								<el-button size="small" @click="resumeTrack" v-if="isTrackPlaying && trackPaused" type="primary">
+								<el-button size="small" @click="resumeTrack" v-if="isTrackPlaying && trackPaused" type="primary" :disabled="mapLoading">
 									<el-icon><VideoPlay /></el-icon>
 									继续
 								</el-button>
-								<el-button size="small" @click="stopTrack" v-if="isTrackPlaying" type="danger">
+								<el-button size="small" @click="stopTrack" v-if="isTrackPlaying" type="danger" :disabled="mapLoading">
 									<el-icon><Close /></el-icon>
 									停止
 								</el-button>
-								<el-button size="small" @click="restartTrack" v-if="!isTrackPlaying" type="success">
+								<el-button
+									size="small"
+									@click="restartTrack"
+									v-if="!isTrackPlaying && trackProgress.current > 0"
+									type="success"
+									:disabled="mapLoading"
+								>
 									<el-icon><Refresh /></el-icon>
 									重新播放
 								</el-button>
@@ -74,65 +158,69 @@
 									<el-tag v-if="loadError" type="danger" size="small" class="ml-2">数据获取失败</el-tag>
 								</div>
 							</el-descriptions-item>
-							<el-descriptions-item label="当前位置" class-name="location-content-cell">
-								<div class="content-wrapper">
-									<span v-if="!mapLoading">{{ locationData?.address || '---' }}</span>
-									<div v-else class="loading-placeholder"></div>
-								</div>
-							</el-descriptions-item>
-							<el-descriptions-item label="更新时间">
-								<div class="content-wrapper">
-									<span v-if="!mapLoading">{{ locationData?.updateTime || '---' }}</span>
-									<div v-else class="loading-placeholder"></div>
-								</div>
-							</el-descriptions-item>
-							<el-descriptions-item label="经纬度" class-name="coordinate-content-cell">
-								<div class="content-wrapper">
-									<span v-if="!mapLoading">{{ locationData ? `${locationData.longitude}, ${locationData.latitude}` : '---' }}</span>
-									<div v-else class="loading-placeholder"></div>
-								</div>
-							</el-descriptions-item>
-							<el-descriptions-item label="移动状态">
-								<div class="content-wrapper">
-									<el-tag v-if="!mapLoading" :type="loadError ? 'info' : locationData ? 'success' : 'warning'">
-										{{ loadError ? '未知' : locationData ? '静止中' : '加载中' }}
-									</el-tag>
-									<div v-else class="loading-placeholder" style="width: 60px"></div>
-								</div>
-							</el-descriptions-item>
-							<el-descriptions-item label="定位方式">
-								<div class="content-wrapper">
-									<el-tag v-if="!mapLoading" :type="loadError ? 'info' : locationData ? 'primary' : 'warning'">
-										{{ loadError ? '未知' : locationData ? 'GPS' : '加载中' }}
-									</el-tag>
-									<div v-else class="loading-placeholder" style="width: 50px"></div>
-								</div>
-							</el-descriptions-item>
-							<el-descriptions-item label="信号强度">
-								<div class="content-wrapper">
-									<template v-if="!mapLoading">
-										<el-rate
-											v-if="locationData"
-											v-model="signalStrength"
-											:max="4"
-											disabled
-											show-score
-											text-color="#ff9900"
-											score-template="{value}格"
-										/>
-										<el-rate v-else :max="4" disabled :model-value="loadError ? 0 : 1" />
-									</template>
-									<div v-else class="loading-placeholder" style="width: 120px"></div>
-								</div>
-							</el-descriptions-item>
-							<el-descriptions-item label="在线状态">
-								<div class="content-wrapper">
-									<el-tag v-if="!mapLoading" :type="loadError ? 'danger' : locationData ? 'success' : 'warning'">
-										{{ loadError ? '离线' : locationData ? '在线' : '连接中' }}
-									</el-tag>
-									<div v-else class="loading-placeholder" style="width: 50px"></div>
-								</div>
-							</el-descriptions-item>
+							<template v-if="currentMode === 'location'">
+								<el-descriptions-item label="当前位置" class-name="location-content-cell">
+									<div class="content-wrapper">
+										<span v-if="!mapLoading">{{ locationData?.address || '---' }}</span>
+										<div v-else class="loading-placeholder"></div>
+									</div>
+								</el-descriptions-item>
+								<el-descriptions-item label="更新时间">
+									<div class="content-wrapper">
+										<span v-if="!mapLoading">{{ locationData?.updateTime || '---' }}</span>
+										<div v-else class="loading-placeholder"></div>
+									</div>
+								</el-descriptions-item>
+								<el-descriptions-item label="经纬度" class-name="coordinate-content-cell">
+									<div class="content-wrapper">
+										<span v-if="!mapLoading">{{ locationData ? `${locationData.longitude}, ${locationData.latitude}` : '---' }}</span>
+										<div v-else class="loading-placeholder"></div>
+									</div>
+								</el-descriptions-item>
+							</template>
+							<template v-else>
+								<el-descriptions-item label="轨迹长度">
+									<div class="content-wrapper">
+										<span v-if="!mapLoading && trackLength">{{ trackLength }} 米</span>
+										<div v-else class="loading-placeholder"></div>
+									</div>
+								</el-descriptions-item>
+							</template>
+							<template v-if="currentMode === 'location'">
+								<el-descriptions-item label="定位方式">
+									<div class="content-wrapper">
+										<el-tag v-if="!mapLoading" :type="loadError ? 'info' : locationData ? 'primary' : 'warning'">
+											{{ loadError ? '未知' : locationData ? 'GPS' : '加载中' }}
+										</el-tag>
+										<div v-else class="loading-placeholder" style="width: 50px"></div>
+									</div>
+								</el-descriptions-item>
+								<el-descriptions-item label="信号强度">
+									<div class="content-wrapper">
+										<template v-if="!mapLoading">
+											<el-rate
+												v-if="locationData"
+												v-model="signalStrength"
+												:max="4"
+												disabled
+												show-score
+												text-color="#ff9900"
+												score-template="{value}格"
+											/>
+											<el-rate v-else :max="4" disabled :model-value="loadError ? 0 : 1" />
+										</template>
+										<div v-else class="loading-placeholder" style="width: 120px"></div>
+									</div>
+								</el-descriptions-item>
+							</template>
+							<template v-else>
+								<el-descriptions-item label="轨迹点数">
+									<div class="content-wrapper">
+										<el-tag v-if="!mapLoading" type="success"> {{ trackProgress.total + 1 }} 个点 </el-tag>
+										<div v-else class="loading-placeholder" style="width: 50px"></div>
+									</div>
+								</el-descriptions-item>
+							</template>
 						</el-descriptions>
 					</div>
 				</div>
@@ -151,7 +239,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick, onUnmounted } from 'vue';
+import { ref, computed, nextTick, onUnmounted, reactive } from 'vue';
 import { ElMessage } from 'element-plus';
 import { Refresh, Loading, VideoPause, VideoPlay, Close, Check } from '@element-plus/icons-vue';
 
@@ -186,6 +274,27 @@ const mapContainer = ref<HTMLElement | null>(null);
 const signalStrength = ref(3);
 const loadError = ref(false);
 const mapLoading = ref(false);
+
+// 时间筛选相关
+const timeFilter = reactive({
+	startTime: null as string | null,
+	endTime: null as string | null,
+});
+
+// 轨迹线相关
+const trackLine = ref<any>(null);
+
+// 当前轨迹点信息
+const currentPoint = ref<{ lng: number; lat: number; time?: string; address?: string } | null>(null);
+
+// 轨迹起终点信息
+const trackBounds = ref<{
+	start?: { address?: string };
+	end?: { address?: string };
+} | null>(null);
+
+// 轨迹总长度（米）
+const trackLength = ref<number>(0);
 
 // 轨迹相关响应式数据
 const isTrackPlaying = ref(false);
@@ -525,10 +634,92 @@ const openDialog = async (boxId: string, mode: 'location' | 'track' = 'location'
 		await nextTick();
 		await initMap();
 
-		// 轨迹模式下自动开始播放
+		// 轨迹模式下初始化轨迹数据
 		if (mode === 'track') {
 			await nextTick(); // 确保地图完全初始化
-			startTrackAnimation();
+			const trackData = generateMockTrackData(locationData.value);
+			trackProgress.value = { current: 0, total: trackData.length - 1 };
+
+			// 绘制轨迹线
+			const T = window.T;
+			trackLine.value = new T.Polyline(trackData, {
+				color: '#409EFF',
+				weight: 4,
+				opacity: 0.8,
+				lineStyle: 'solid',
+			});
+			map.addOverLay(trackLine.value);
+
+			// 将地图视野调整到轨迹范围
+			const bounds = new T.LngLatBounds(trackData[0], trackData[0]);
+			trackData.forEach((point: any) => bounds.extend(point));
+			map.setViewport(trackData);
+
+			// 计算轨迹总长度
+			let totalLength = 0;
+			for (let i = 1; i < trackData.length; i++) {
+				const prevPoint = trackData[i - 1];
+				const currentPoint = trackData[i];
+				totalLength += prevPoint.distanceTo(currentPoint);
+			}
+			trackLength.value = Math.round(totalLength);
+
+			// 获取起终点地址
+			trackBounds.value = {
+				start: { address: '获取地址中...' },
+				end: { address: '获取地址中...' },
+			};
+
+			// 异步获取起终点地址
+			if (trackData.length > 0) {
+				reverseGeocode(trackData[0])
+					.then((address) => {
+						if (trackBounds.value) {
+							trackBounds.value.start = { address };
+						}
+					})
+					.catch(() => {
+						if (trackBounds.value) {
+							trackBounds.value.start = { address: '地址解析失败' };
+						}
+					});
+
+				const endPoint = trackData[trackData.length - 1];
+				reverseGeocode(endPoint)
+					.then((address) => {
+						if (trackBounds.value) {
+							trackBounds.value.end = { address };
+						}
+					})
+					.catch(() => {
+						if (trackBounds.value) {
+							trackBounds.value.end = { address: '地址解析失败' };
+						}
+					});
+			}
+
+			// 初始化轨迹动画
+			carTrack = new T.CarTrack(map, {
+				Datas: trackData,
+				interval: 300,
+				carstyle: {
+					display: true,
+					iconUrl:
+						'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJMMTMuMDkgOC4yNkwyMSA5TDEzLjA5IDE1Ljc0TDEyIDIyTDEwLjkxIDE1Ljc0TDMgOUwxMC45MSA4LjI2TDEyIDJaIiBmaWxsPSIjNDA5RUZGIi8+Cjwvc3ZnPgo=',
+					width: 24,
+					height: 24,
+				},
+				passOneNode: (lnglat: any, index: number, total: number) => {
+					trackProgress.value = { current: index, total: total };
+				},
+				onTrackComplete: () => {
+					isTrackPlaying.value = false;
+					trackPaused.value = false;
+					ElMessage.success('轨迹播放完成');
+				},
+			});
+
+			ElMessage.success(`已加载 ${trackData.length} 个轨迹点`);
 		}
 	} catch (error: any) {
 		console.error('获取位置信息失败:', error);
@@ -589,6 +780,23 @@ const refreshLocation = async () => {
 // 功能按钮处理 - 已删除电子围栏和告警记录功能
 
 // 轨迹控制函数
+const startTrack = () => {
+	if (carTrack) {
+		carTrack.start();
+		isTrackPlaying.value = true;
+		trackPaused.value = false;
+		ElMessage.success('轨迹播放开始');
+	} else {
+		const trackData = reinitTrackData();
+		if (trackData) {
+			carTrack?.start();
+			isTrackPlaying.value = true;
+			trackPaused.value = false;
+			ElMessage.success('轨迹播放开始');
+		}
+	}
+};
+
 const pauseTrack = () => {
 	if (carTrack) {
 		carTrack.pause();
@@ -610,7 +818,6 @@ const stopTrack = () => {
 	}
 	isTrackPlaying.value = false;
 	trackPaused.value = false;
-	trackProgress.value = { current: 0, total: 0 };
 
 	// 轨迹模式下不显示原始标记点
 	if (currentMode.value === 'location' && locationData.value) {
@@ -620,26 +827,168 @@ const stopTrack = () => {
 
 const restartTrack = () => {
 	if (locationData.value) {
-		startTrackAnimation();
+		const trackData = reinitTrackData();
+		if (trackData) {
+			carTrack?.start();
+			isTrackPlaying.value = true;
+			trackPaused.value = false;
+			ElMessage.success('轨迹重新播放');
+		}
 	}
 };
 
-// 开始轨迹动画
-const startTrackAnimation = () => {
+// 格式化进度条提示
+const formatProgressTooltip = (value: number): string => {
+	if (!carTrack?.options.Datas) return `点 ${value + 1}`;
+	const point = carTrack.options.Datas[value];
+	if (!point) return `点 ${value + 1}`;
+	return `点 ${value + 1}\n经度: ${point.lng.toFixed(6)}\n纬度: ${point.lat.toFixed(6)}`;
+};
+
+// 逆地理编码 - 将经纬度转换为地址
+const reverseGeocode = (lnglat: { lng: number; lat: number }): Promise<string> => {
+	return new Promise((resolve, reject) => {
+		if (!window.T) {
+			reject(new Error('天地图API未加载'));
+			return;
+		}
+
+		try {
+			// 创建地理编码服务
+			const geocoder = new window.T.Geocoder();
+
+			// 调用逆地理编码服务
+			geocoder.getLocation(new window.T.LngLat(lnglat.lng, lnglat.lat), {
+				success: (result: any) => {
+					if (result.getStatus() === 0) {
+						const address = result.getAddress(); // 结构化地址
+						const addressComponent = result.getAddressComponent(); // 地址组成要素
+
+						// 组合完整地址
+						const fullAddress = [
+							addressComponent.province,
+							addressComponent.city,
+							addressComponent.district,
+							addressComponent.street,
+							addressComponent.streetNumber,
+						]
+							.filter(Boolean)
+							.join('');
+
+						resolve(fullAddress || address || '未知位置');
+					} else {
+						reject(new Error('地址解析失败'));
+					}
+				},
+				error: () => {
+					reject(new Error('地址解析服务异常'));
+				},
+			});
+		} catch (error) {
+			reject(error);
+		}
+	});
+};
+
+// 处理进度条变化
+const handleProgressChange = async (value: number) => {
+	if (!carTrack?.options.Datas) return;
+
+	// 暂停当前播放
+	if (isTrackPlaying.value) {
+		carTrack.pause();
+		trackPaused.value = true;
+	}
+
+	// 更新位置
+	const point = carTrack.options.Datas[value];
+	if (point) {
+		carTrack.carMarker.setLnglat(point);
+
+		// 计算旋转角度
+		if (value > 0) {
+			const prevPoint = carTrack.options.Datas[value - 1];
+			const angle = carTrack.calculateAngle(prevPoint, point);
+			carTrack.carMarker.setRotate(angle);
+		}
+
+		// 更新进度和当前点信息
+		trackProgress.value.current = value;
+		currentPoint.value = {
+			lng: point.lng,
+			lat: point.lat,
+			time: point.time || new Date().toLocaleString(), // 模拟数据时间
+			address: '获取地址中...',
+		};
+
+		// 将地图中心移动到当前点
+		map.panTo(point);
+
+		// 获取地址信息
+		try {
+			const address = await reverseGeocode(point);
+			if (currentPoint.value && currentPoint.value.lng === point.lng && currentPoint.value.lat === point.lat) {
+				currentPoint.value.address = address;
+			}
+		} catch (error) {
+			console.warn('获取地址失败:', error);
+			if (currentPoint.value && currentPoint.value.lng === point.lng && currentPoint.value.lat === point.lat) {
+				currentPoint.value.address = '地址解析失败';
+			}
+		}
+	}
+};
+
+// 处理时间筛选变化
+const handleTimeChange = () => {
+	if (!timeFilter.startTime || !timeFilter.endTime) return;
+
+	// 这里应该调用后端API获取指定时间范围内的轨迹点
+	// 目前使用模拟数据，仅更新点数显示
+	stopTrack();
+	const trackData = reinitTrackData();
+	if (trackData) {
+		ElMessage.success(`已加载 ${trackData.length} 个轨迹点`);
+	}
+};
+
+// 重新初始化轨迹数据
+const reinitTrackData = () => {
 	if (!map || !locationData.value) return;
 
-	// 生成模拟轨迹数据
 	const trackData = generateMockTrackData(locationData.value);
+	trackProgress.value = { current: 0, total: trackData.length - 1 };
 
-	// 清除现有标记点
+	// 清除现有标记点和轨迹线
 	if (marker) {
 		map.removeOverLay(marker);
 	}
+	if (trackLine.value) {
+		map.removeOverLay(trackLine.value);
+	}
+	if (carTrack) {
+		carTrack.clear();
+	}
+
+	// 绘制轨迹线
+	const T = window.T;
+	trackLine.value = new T.Polyline(trackData, {
+		color: '#409EFF',
+		weight: 4,
+		opacity: 0.8,
+		lineStyle: 'solid',
+	});
+	map.addOverLay(trackLine.value);
+
+	// 将地图视野调整到轨迹范围
+	const bounds = new T.LngLatBounds(trackData[0], trackData[0]);
+	trackData.forEach((point: any) => bounds.extend(point));
+	map.setViewport(trackData);
 
 	// 初始化轨迹动画
-	carTrack = new window.T.CarTrack(map, {
+	carTrack = new T.CarTrack(map, {
 		Datas: trackData,
-		interval: 300, // 动画间隔毫秒
+		interval: 300,
 		carstyle: {
 			display: true,
 			iconUrl:
@@ -651,18 +1000,13 @@ const startTrackAnimation = () => {
 			trackProgress.value = { current: index, total: total };
 		},
 		onTrackComplete: () => {
-			// 轨迹播放完成
 			isTrackPlaying.value = false;
 			trackPaused.value = false;
 			ElMessage.success('轨迹播放完成');
 		},
 	});
 
-	isTrackPlaying.value = true;
-	trackPaused.value = false;
-	carTrack.start();
-
-	ElMessage.success('轨迹播放开始');
+	return trackData;
 };
 
 // 生成模拟轨迹数据
@@ -670,6 +1014,7 @@ const generateMockTrackData = (centerPoint: LocationData): any[] => {
 	const points: any[] = [];
 	const baseLatitude = centerPoint.latitude;
 	const baseLongitude = centerPoint.longitude;
+	const T = window.T;
 
 	// 生成围绕中心点的轨迹路径
 	const totalPoints = 15;
@@ -680,13 +1025,11 @@ const generateMockTrackData = (centerPoint: LocationData): any[] => {
 		const deltaLat = Math.sin(angle) * radius;
 		const deltaLng = Math.cos(angle) * radius;
 
-		// 创建 T.LngLat 格式的点
-		const point = new window.T.LngLat(baseLongitude + deltaLng, baseLatitude + deltaLat);
-
+		// 直接创建 T.LngLat 对象
+		const point = new T.LngLat(baseLongitude + deltaLng, baseLatitude + deltaLat);
 		points.push(point);
 	}
-	console.log(11111111111111111);
-	console.log(points);
+
 	return points;
 };
 
@@ -767,29 +1110,147 @@ defineExpose({
 			height: 100%;
 			display: flex;
 			flex-direction: column;
-			justify-content: space-between;
+
+			.track-header {
+				margin-bottom: 16px;
+
+				.map-status {
+					min-height: 120px; // 与 time-filter 等高
+					display: flex;
+					align-items: center;
+					padding: 16px;
+					background-color: #f8f9fa;
+					border: 1px solid #e4e7ed;
+					border-radius: 4px;
+
+					.loading-alert {
+						width: 100%;
+						:deep(.el-alert__icon) {
+							font-size: 16px;
+							top: 50%;
+							transform: translateY(-50%);
+						}
+					}
+				}
+
+				.time-filter {
+					min-height: 120px; // 固定高度
+					padding: 16px;
+					background-color: #f8f9fa;
+					border: 1px solid #e4e7ed;
+					border-radius: 4px;
+
+					:deep(.el-form-item) {
+						margin-bottom: 16px;
+						display: flex;
+						align-items: center;
+
+						&:last-child {
+							margin-bottom: 0;
+						}
+
+						.el-form-item__label {
+							padding: 0 12px 0 0;
+							line-height: 32px;
+							height: 32px;
+							color: #606266;
+						}
+
+						.el-form-item__content {
+							flex: 1;
+							min-width: 0;
+						}
+
+						.el-date-editor {
+							width: 100%;
+						}
+					}
+				}
+			}
 
 			.track-controls {
-				height: 100%;
+				display: flex;
+				flex-direction: column;
 				padding: 18px;
 				border: 1px solid #e4e7ed;
 				background-color: #f8f9fa;
 				border-radius: 8px;
+				overflow: hidden;
+				display: grid;
+				grid-template-rows: 1fr auto auto;
 
 				.track-info {
-					display: flex;
-					justify-content: space-between;
-					align-items: center;
-					margin-bottom: 24px;
+					.track-status {
+						display: flex;
+						align-items: center;
+						gap: 12px;
+						padding: 12px;
 
-					.track-progress {
-						font-size: 13px;
-						color: #606266;
-						font-weight: 500;
-						background: #fff;
-						padding: 4px 8px;
+						.track-progress {
+							font-size: 13px;
+							color: #606266;
+							font-weight: 500;
+						}
+					}
+
+					.point-details {
+						display: flex;
+						flex-direction: column;
+						gap: 8px;
+						font-size: 12px;
+						color: #666;
+						padding: 12px;
 						border-radius: 4px;
-						border: 1px solid #e4e7ed;
+						margin-bottom: 12px;
+
+						.point-address {
+							.label {
+								color: #303133;
+								font-weight: 500;
+								margin-right: 4px;
+							}
+							.value {
+								color: #409eff;
+								word-break: break-all;
+								line-height: 1.4;
+							}
+						}
+
+						.point-coordinates {
+							display: flex;
+							gap: 12px;
+							font-family: 'Courier New', monospace;
+							span {
+								white-space: nowrap;
+							}
+						}
+
+						.point-time {
+							color: #909399;
+							font-size: 11px;
+						}
+					}
+				}
+
+				.progress-slider {
+					padding: 12px;
+
+					:deep(.el-slider) {
+						margin: 0 8px;
+
+						.el-slider__button {
+							width: 16px;
+							height: 16px;
+							border: 2px solid #409eff;
+						}
+
+						.el-slider__bar {
+							background-color: #409eff;
+						}
+
+						.el-slider__runway {
+							height: 6px;
+						}
 					}
 				}
 
@@ -798,26 +1259,31 @@ defineExpose({
 					gap: 10px;
 					justify-content: center;
 					flex-wrap: wrap;
+					padding: 12px;
 
 					.el-button {
-						padding: 16px 24px;
+						padding: 8px 16px;
 						min-width: 70px;
 					}
 				}
 			}
 
 			.status-control-area {
-				height: 120px;
+				flex: 1;
+				min-height: 0;
+				display: flex;
+				flex-direction: column;
+				margin-bottom: 16px;
 			}
 
 			.map-status {
 				text-align: center;
-				height: 100%;
-				border-radius: 8px;
 				padding: 20px;
+				background: #fff;
+				border-radius: 8px;
+				border: 1px solid #e4e7ed;
 
 				.el-alert {
-					height: 100%;
 					display: flex;
 					align-items: center;
 					justify-content: center;
@@ -826,29 +1292,16 @@ defineExpose({
 				.el-alert--loading {
 					color: rgb(179, 179, 179) !important;
 				}
-				.status-tag {
-					padding: 8px 16px;
-					font-size: 14px;
-					font-weight: 500;
-					display: inline-flex;
-					align-items: center;
-					gap: 8px;
-					border: none;
-					border-radius: 20px;
-
-					.el-icon {
-						font-size: 16px;
-					}
-				}
 			}
 
 			.location-info {
+				flex-shrink: 0;
 				flex-shrink: 0;
 				overflow-y: auto;
 				display: flex;
 				flex-direction: column;
 				border-top: 2px solid #e4e7ed;
-				padding-top: 15px;
+				padding-top: 20px;
 
 				:deep(.el-descriptions) {
 					.el-descriptions__table {
@@ -955,6 +1408,35 @@ defineExpose({
 					min-width: 120px;
 					display: inline-flex;
 					height: 24px;
+				}
+
+				.track-time-range {
+					color: #606266;
+					font-size: 13px;
+					font-family: 'Courier New', monospace;
+					word-break: break-all;
+					line-height: 1.4;
+				}
+
+				.track-range {
+					.range-item {
+						margin-bottom: 8px;
+						&:last-child {
+							margin-bottom: 0;
+						}
+
+						.label {
+							color: #303133;
+							font-weight: 500;
+							margin-right: 4px;
+						}
+
+						.value {
+							color: #409eff;
+							word-break: break-all;
+							line-height: 1.4;
+						}
+					}
 				}
 			}
 		}

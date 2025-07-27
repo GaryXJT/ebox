@@ -19,7 +19,7 @@
 							<el-icon>
 								<ele-FolderAdd />
 							</el-icon>
-							箱体授权
+							箱体授权（不急）
 						</el-button>
 						<el-button size="default" type="warning" class="ml10" @click="onOpenFenceTemplate">
 							<el-icon>
