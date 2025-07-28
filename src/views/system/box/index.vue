@@ -120,7 +120,7 @@
 				<el-icon class="warning-icon"><ele-Warning /></el-icon>
 				<div class="warning-content">
 					<p class="warning-title">危险操作警告</p>
-					<p class="warning-text">此操作将永久删除箱体："{{ deleteDialog.boxId }}"，删除后无法恢复！</p>
+					<p class="warning-text">此操作将永久删除箱体："{{ deleteDialog.uuid }}"，删除后无法恢复！</p>
 					<div class="password-input">
 						<el-form-item label="请输入登录密码确认：" label-width="140px">
 							<el-input v-model="deleteDialog.password" type="password" placeholder="请输入当前登录账户密码" show-password clearable />
@@ -144,7 +144,7 @@
 				<el-icon class="warning-icon"><ele-Warning /></el-icon>
 				<div class="warning-content">
 					<p class="warning-title">解绑确认</p>
-					<p class="warning-text">确定要解绑箱体"{{ unbindDialog.boxId }}"与用户"{{ unbindDialog.userName }}"的绑定关系吗？</p>
+					<p class="warning-text">确定要解绑箱体"{{ unbindDialog.uuid }}"与用户"{{ unbindDialog.userName }}"的绑定关系吗？</p>
 				</div>
 			</div>
 			<template #footer>
@@ -161,7 +161,7 @@
 		<el-dialog v-model="bindDialog.visible" title="绑定用户" width="500px">
 			<el-form :model="bindDialog" label-width="100px">
 				<el-form-item label="箱体编号：">
-					<el-input v-model="bindDialog.boxId" disabled />
+					<el-input v-model="bindDialog.uuid" disabled />
 				</el-form-item>
 				<el-form-item label="选择用户：" required>
 					<el-select v-model="bindDialog.selectedUser" placeholder="请选择要绑定的用户" style="width: 100%">
@@ -183,7 +183,7 @@
 				<el-icon class="warning-icon"><ele-Unlock /></el-icon>
 				<div class="warning-content">
 					<p class="warning-title">远程开箱确认</p>
-					<p class="warning-text">确定要远程开启箱体"{{ remoteOpenDialog.boxId }}"吗？</p>
+					<p class="warning-text">确定要远程开启箱体"{{ remoteOpenDialog.uuid }}"吗？</p>
 					<p class="info-text">开箱后请确保箱体处于安全环境中。</p>
 				</div>
 			</div>
@@ -257,38 +257,22 @@
 </template>
 
 <script setup lang="ts">
-import { toRefs, reactive, onMounted, ref, defineComponent, toRaw } from 'vue';
+import { toRefs, reactive, onMounted, ref } from 'vue';
 import { ElMessageBox, ElMessage } from 'element-plus';
 import LocationMap from '/@/views/system/users/component/locationMap.vue';
 import FenceTemplateDialog from './component/FenceTemplateDialog.vue';
-import { deleteBox, getBoxList, getBoxLocation, getBoxTrajectory, activateBox } from '/@/api/system/box';
-// TODO：定位 电子围栏的弹窗，用户那边相关箱体的轨迹记录 两边应该可以用一个组件
+import { deleteBox, getBoxList } from '/@/api/system/box';
+import type { BoxInfo, BoxQueryParams } from '/@/api/system/box/types';
+import { BoxType, LockStatus, BluetoothStatus, ActivationStatus } from '/@/api/system/box/types';
+
 // 定义接口来定义对象的类型
-interface TableData {
-	id: number;
-	boxId: string;
-	specification: string;
-	bindUser?: {
-		name: string;
-		dept: string;
-	};
-	coverStatus: string;
-	healthStatus: string;
-	fenceStatus: string;
-	batteryLevel: number;
-	createdAt: string;
-}
 interface TableDataState {
 	ids: number[];
 	tableData: {
-		data: Array<TableData>;
+		data: Array<BoxInfo>;
 		total: number;
 		loading: boolean;
-		param: {
-			boxId: string;
-			pageNum: number;
-			pageSize: number;
-		};
+		param: BoxQueryParams;
 	};
 }
 defineOptions({ name: 'apiV1SystemBoxList' });
@@ -312,8 +296,8 @@ const state = reactive<TableDataState>({
 // 删除对话框状态
 const deleteDialog = reactive({
 	visible: false,
-	boxId: '',
-	rowData: null as TableData | null,
+	uuid: '',
+	rowData: null as BoxInfo | null,
 	password: '',
 	countdown: 0,
 });
@@ -321,25 +305,25 @@ const deleteDialog = reactive({
 // 解绑对话框状态
 const unbindDialog = reactive({
 	visible: false,
-	boxId: '',
+	uuid: '',
 	userName: '',
-	rowData: null as TableData | null,
+	rowData: null as BoxInfo | null,
 	countdown: 0,
 });
 
 // 绑定对话框状态
 const bindDialog = reactive({
 	visible: false,
-	boxId: '',
+	uuid: '',
 	selectedUser: '',
-	rowData: null as TableData | null,
+	rowData: null as BoxInfo | null,
 });
 
 // 远程开箱对话框状态
 const remoteOpenDialog = reactive({
 	visible: false,
-	boxId: '',
-	rowData: null as TableData | null,
+	uuid: '',
+	rowData: null as BoxInfo | null,
 });
 
 // 用户列表（模拟数据）
@@ -380,119 +364,23 @@ const { tableData } = toRefs(state);
 const initTableData = () => {
 	boxList();
 };
-const boxList = () => {
-	// 暂时使用模拟数据，后端接口通了之后再启用真实API
-	// getBoxList(state.tableData.param).then(res=>{
-	//   state.tableData.data = res.data.boxList??[];
-	//   state.tableData.total = res.data.total;
-	// })
-
-	// 模拟数据
-	const mockData = [
-		{
-			id: 1,
-			boxId: 'BOX001',
-			specification: 'suitcase',
-			bindUser: { name: '张三', dept: '研发部' },
-			coverStatus: 'closed',
-			healthStatus: 'healthy',
-			fenceStatus: 'normal',
-			batteryLevel: 85,
-			createdAt: '2024-01-15 10:30:00',
-		},
-		{
-			id: 2,
-			boxId: 'BOX002',
-			specification: 'trolley',
-			bindUser: undefined,
-			coverStatus: 'open',
-			healthStatus: 'abnormal',
-			fenceStatus: 'warning',
-			batteryLevel: 15,
-			createdAt: '2024-01-14 14:20:00',
-		},
-		{
-			id: 3,
-			boxId: 'BOX003',
-			specification: 'suitcase',
-			bindUser: { name: '李四', dept: '市场部' },
-			coverStatus: 'closed',
-			healthStatus: 'healthy',
-			fenceStatus: 'normal',
-			batteryLevel: 92,
-			createdAt: '2024-01-13 09:15:00',
-		},
-		{
-			id: 4,
-			boxId: 'BOX004',
-			specification: 'trolley',
-			bindUser: { name: '王五', dept: '财务部' },
-			coverStatus: 'closed',
-			healthStatus: 'healthy',
-			fenceStatus: 'normal',
-			batteryLevel: 67,
-			createdAt: '2024-01-12 16:45:00',
-		},
-		{
-			id: 5,
-			boxId: 'BOX005',
-			specification: 'suitcase',
-			bindUser: undefined,
-			coverStatus: 'open',
-			healthStatus: 'abnormal',
-			fenceStatus: 'warning',
-			batteryLevel: 8,
-			createdAt: '2024-01-11 11:30:00',
-		},
-		{
-			id: 6,
-			boxId: 'BOX006',
-			specification: 'trolley',
-			bindUser: { name: '赵六', dept: '人事部' },
-			coverStatus: 'closed',
-			healthStatus: 'healthy',
-			fenceStatus: 'normal',
-			batteryLevel: 78,
-			createdAt: '2024-01-10 13:20:00',
-		},
-		{
-			id: 7,
-			boxId: 'BOX007',
-			specification: 'suitcase',
-			bindUser: { name: '孙七', dept: '运营部' },
-			coverStatus: 'closed',
-			healthStatus: 'healthy',
-			fenceStatus: 'normal',
-			batteryLevel: 95,
-			createdAt: '2024-01-09 08:10:00',
-		},
-		{
-			id: 8,
-			boxId: 'BOX008',
-			specification: 'trolley',
-			bindUser: undefined,
-			coverStatus: 'open',
-			healthStatus: 'abnormal',
-			fenceStatus: 'warning',
-			batteryLevel: 3,
-			createdAt: '2024-01-08 15:55:00',
-		},
-	];
-
-	// 根据搜索条件过滤数据
-	let filteredData = mockData;
-	if (state.tableData.param.boxId) {
-		filteredData = mockData.filter((item) => item.boxId.toLowerCase().includes(state.tableData.param.boxId.toLowerCase()));
+const boxList = async () => {
+	try {
+		state.tableData.loading = true;
+		const res = await getBoxList(state.tableData.param);
+		console.log(res);
+		if (res.code === 0) {
+			state.tableData.data = res.data.list;
+			state.tableData.total = res.data.total;
+		} else {
+			ElMessage.error(res.data.message || '获取箱体列表失败');
+		}
+	} catch (error) {
+		console.error('获取箱体列表失败:', error);
+		ElMessage.error('获取箱体列表失败');
+	} finally {
+		state.tableData.loading = false;
 	}
-
-	// 模拟分页
-	const pageSize = state.tableData.param.pageSize;
-	const pageNum = state.tableData.param.pageNum;
-	const startIndex = (pageNum - 1) * pageSize;
-	const endIndex = startIndex + pageSize;
-
-	state.tableData.data = filteredData.slice(startIndex, endIndex);
-	state.tableData.total = filteredData.length;
 };
 // 打开箱体授权对话框
 const onOpenAuthDialog = () => {
@@ -576,12 +464,12 @@ onMounted(() => {
 	initTableData();
 });
 // 多选框选中数据
-const handleSelectionChange = (selection: Array<TableData>) => {
+const handleSelectionChange = (selection: Array<BoxInfo>) => {
 	state.ids = selection.map((item) => item.id);
 };
 
 // 处理更多操作
-const handleMoreAction = (command: string, row: TableData) => {
+const handleMoreAction = (command: string, row: BoxInfo) => {
 	if (command === 'activate') {
 		onActivateBox(row);
 	} else if (command === 'delete') {
@@ -596,9 +484,9 @@ const handleMoreAction = (command: string, row: TableData) => {
 };
 
 // 显示删除确认对话框
-const showDeleteDialog = (row: TableData) => {
+const showDeleteDialog = (row: BoxInfo) => {
 	deleteDialog.visible = true;
-	deleteDialog.boxId = row.boxId;
+	deleteDialog.uuid = row.uuid;
 	deleteDialog.rowData = row;
 	deleteDialog.password = '';
 	deleteDialog.countdown = 5; // 5秒倒计时
@@ -615,7 +503,7 @@ const showDeleteDialog = (row: TableData) => {
 // 取消删除
 const cancelDelete = () => {
 	deleteDialog.visible = false;
-	deleteDialog.boxId = '';
+	deleteDialog.uuid = '';
 	deleteDialog.rowData = null;
 	deleteDialog.password = '';
 	deleteDialog.countdown = 0;
@@ -641,19 +529,19 @@ const confirmDelete = () => {
 };
 
 // 绑定电子围栏
-const onBindFence = (row: TableData) => {
+const onBindFence = (row: BoxInfo) => {
 	ElMessage.info('绑定电子围栏功能开发中...');
 };
 
 // 显示解绑确认对话框
-const showUnbindDialog = (row: TableData) => {
+const showUnbindDialog = (row: BoxInfo) => {
 	if (!row.bindUser) {
 		ElMessage.warning('该箱体尚未绑定用户');
 		return;
 	}
 
 	unbindDialog.visible = true;
-	unbindDialog.boxId = row.boxId;
+	unbindDialog.uuid = row.uuid;
 	unbindDialog.userName = row.bindUser.name;
 	unbindDialog.rowData = row;
 	unbindDialog.countdown = 3; // 3秒倒计时
@@ -670,7 +558,7 @@ const showUnbindDialog = (row: TableData) => {
 // 取消解绑
 const cancelUnbind = () => {
 	unbindDialog.visible = false;
-	unbindDialog.boxId = '';
+	unbindDialog.uuid = '';
 	unbindDialog.userName = '';
 	unbindDialog.rowData = null;
 	unbindDialog.countdown = 0;
@@ -689,9 +577,9 @@ const confirmUnbind = () => {
 };
 
 // 显示绑定对话框
-const showBindDialog = (row: TableData) => {
+const showBindDialog = (row: BoxInfo) => {
 	bindDialog.visible = true;
-	bindDialog.boxId = row.boxId;
+	bindDialog.uuid = row.uuid;
 	bindDialog.selectedUser = '';
 	bindDialog.rowData = row;
 };
@@ -699,7 +587,7 @@ const showBindDialog = (row: TableData) => {
 // 取消绑定
 const cancelBind = () => {
 	bindDialog.visible = false;
-	bindDialog.boxId = '';
+	bindDialog.uuid = '';
 	bindDialog.selectedUser = '';
 	bindDialog.rowData = null;
 };
@@ -715,6 +603,7 @@ const confirmBind = () => {
 	const selectedUserInfo = userList.value.find((user) => user.id === bindDialog.selectedUser);
 	if (selectedUserInfo && bindDialog.rowData) {
 		bindDialog.rowData.bindUser = {
+			id: Number(selectedUserInfo.id),
 			name: selectedUserInfo.name,
 			dept: selectedUserInfo.dept,
 		};
@@ -725,16 +614,16 @@ const confirmBind = () => {
 };
 
 // 显示远程开箱对话框
-const showRemoteOpenDialog = (row: TableData) => {
+const showRemoteOpenDialog = (row: BoxInfo) => {
 	remoteOpenDialog.visible = true;
-	remoteOpenDialog.boxId = row.boxId;
+	remoteOpenDialog.uuid = row.uuid;
 	remoteOpenDialog.rowData = row;
 };
 
 // 取消远程开箱
 const cancelRemoteOpen = () => {
 	remoteOpenDialog.visible = false;
-	remoteOpenDialog.boxId = '';
+	remoteOpenDialog.uuid = '';
 	remoteOpenDialog.rowData = null;
 };
 
@@ -742,9 +631,9 @@ const cancelRemoteOpen = () => {
 const confirmRemoteOpen = () => {
 	ElMessage.success('远程开箱指令已发送');
 	// 这里应该调用API发送开箱指令
-	// 暂时更新开盖状态
+	// 暂时更新锁状态
 	if (remoteOpenDialog.rowData) {
-		remoteOpenDialog.rowData.coverStatus = 'open';
+		remoteOpenDialog.rowData.lock_stat = 0; // 开锁
 	}
 	cancelRemoteOpen();
 	boxList();
