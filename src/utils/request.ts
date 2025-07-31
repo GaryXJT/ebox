@@ -1,4 +1,4 @@
-import axios, { AxiosInstance } from 'axios';
+import axios, { AxiosInstance, AxiosResponse } from 'axios';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Session } from '/@/utils/storage';
 import qs from 'qs';
@@ -10,7 +10,7 @@ const service: AxiosInstance = axios.create({
 	headers: { 'Content-Type': 'application/json' },
 	paramsSerializer: {
 		serialize(params) {
-			return qs.stringify(params, { allowDots: true,arrayFormat: 'brackets' });
+			return qs.stringify(params, { allowDots: true, arrayFormat: 'brackets' });
 		},
 	},
 });
@@ -35,19 +35,19 @@ service.interceptors.response.use(
 	(response) => {
 		// 对响应数据做点什么
 		const res = response.data;
-		const code = response.data.code
+		const code = response.data.code;
 		if (code === 401) {
-			ElMessageBox.alert('登录状态已过期，请重新登录', '提示', {confirmButtonText:'确定'})
+			ElMessageBox.alert('登录状态已过期，请重新登录', '提示', { confirmButtonText: '确定' })
 				.then(() => {
 					Session.clear(); // 清除浏览器全部临时缓存
 					window.location.href = import.meta.env.BASE_URL; // 去登录页
 				})
 				.catch(() => {});
 		} else if (code !== 0) {
-			ElMessage.error(res.message)
-			return Promise.reject(new Error(res.message))
+			ElMessage.error(res.message);
+			return Promise.reject(new Error(res.message));
 		} else {
-			return res
+			return res;
 		}
 	},
 	(error) => {
@@ -65,4 +65,9 @@ service.interceptors.response.use(
 );
 
 // 导出 axios 实例
-export default service;
+// 重新定义request函数，使其返回类型更准确
+const request = <T = any, R = T>(config: any): Promise<R> => {
+	return service.request<T, R>(config);
+};
+
+export default request;

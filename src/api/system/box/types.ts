@@ -1,26 +1,26 @@
 // 箱体基础信息接口
 export interface BoxInfo {
-	id: number; // 箱体ID
-	uuid: string; // 硬件ID
+	id: string; // 从1开始递增，唯一值
+	uuid: string; // 硬件id，唯一值
 	name: string; // 名称
-	type: number; // 设备形态：1=拉杆，2=手提
-	soc: number; // 电量
+	type: string; // 设备形态。1，拉杆；2，手提
+	soc: string; // 剩余电量，百分制，带负号表示充电中
 	position: {
-		// GeoJSON格式位置信息
 		type: 'Point';
 		coordinates: [number, number]; // [经度, 纬度]
 	};
-	lock_stat: number; // 锁状态：0=未锁，1=已锁
-	bt_stat: number; // 蓝牙状态：0=未连接，1=已连接
-	stat: number; // 激活状态：0=待激活，1=已活
+	lock_stat: string; // 锁状态:未锁=0；已锁=1
+	bt_stat: string; // 蓝牙状态:未连接=0；已连接=1
+	stat: string; // 状态:待激活=0；已激活=1
 	remarks: string; // 备注
 	created_at: string; // 创建时间
 	updated_at: string; // 更新时间
+	deleted_at: string; // 删除时间
+	// 可选的绑定用户信息，通过单独的接口获取
 	bindUser?: {
-		// 绑定的用户信息
-		id: number; // 用户ID
-		name: string; // 用户名称
-		dept: string; // 部门名称
+		id: number;
+		name: string;
+		dept: string;
 	};
 }
 
@@ -75,3 +75,14 @@ export const ActivationStatus = {
 	INACTIVE: 0, // 待激活
 	ACTIVE: 1, // 已激活
 } as const;
+
+// 轨迹点信息接口
+export interface BoxTrackPoint {
+	id: number;
+	boxId: number;
+	point: {
+		type: 'Point';
+		coordinates: [number, number]; // [经度, 纬度]
+	};
+	timestamp: string;
+}

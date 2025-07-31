@@ -1,5 +1,5 @@
 import request from '/@/utils/request';
-import { BoxInfo, BoxQueryParams, PageResult, ApiResponse } from './types';
+import { BoxInfo, BoxQueryParams, PageResult, ApiResponse, BoxTrackPoint } from './types';
 
 // 导出所有子模块
 export * from './fence';
@@ -9,8 +9,43 @@ export * from './userBox';
  * 获取箱体列表
  * @param params 查询参数
  */
-export function getBoxList(params: BoxQueryParams) {
-	return request<ApiResponse<PageResult<BoxInfo>>>({
+// 获取箱体列表
+// 获取箱体绑定的用户信息
+export interface BoxUserInfo {
+	id: number;
+	name: string;
+	dept: string;
+}
+
+// 获取箱体绑定的用户列表
+export function getBoxUserList(eboxid: string): Promise<ApiResponse<BoxUserInfo[]>> {
+	return request({
+		url: '/api/v1/ebox/eboxUserBox/list',
+		method: 'get',
+		params: { eboxid },
+	});
+}
+
+// 获取箱子定位
+// 获取箱体轨迹点列表
+export interface GetBoxTrackPointsParams {
+	pageNum: number; // 页码
+	pageSize: number; // 每页数量
+	boxId: string | number; // 箱体ID
+	timestampstart?: string | null; // 开始时间
+	timestampend?: string | null; // 结束时间
+}
+
+export function getBoxDetail(id: string): Promise<ApiResponse<BoxInfo>> {
+	return request({
+		url: '/api/v1/ebox/eboxBoxes/get',
+		method: 'get',
+		params: { id },
+	});
+}
+
+export function getBoxList(params: BoxQueryParams): Promise<ApiResponse<PageResult<BoxInfo>>> {
+	return request({
 		url: '/api/v1/ebox/eboxBoxes/list',
 		method: 'get',
 		params,
@@ -57,27 +92,8 @@ export function deleteBox(ids: number[]) {
  * 获取箱体轨迹点列表
  * @param params 查询参数
  */
-export function getBoxTrackPoints(params: {
-	pageNum: number; // 页码
-	pageSize: number; // 每页数量
-	boxId: number; // 箱体ID
-	startTime?: number; // 开始时间戳
-	endTime?: number; // 结束时间戳
-}) {
-	return request<
-		ApiResponse<
-			PageResult<{
-				id: number; // 轨迹点ID
-				boxId: number; // 箱体ID
-				position: {
-					// GeoJSON格式位置信息
-					type: 'Point';
-					coordinates: [number, number]; // [经度, 纬度]
-				};
-				time: number; // 记录时间戳
-			}>
-		>
-	>({
+export function getBoxTrackPoints(params: GetBoxTrackPointsParams) {
+	return request({
 		url: '/api/v1/ebox/eboxBoxPoints/list',
 		method: 'get',
 		params,

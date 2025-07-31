@@ -39,12 +39,12 @@
 			<el-table :data="tableData.data" style="width: 100%" @selection-change="handleSelectionChange">
 				<el-table-column type="selection" width="55" align="center" />
 				<el-table-column type="index" label="序号" width="60" sortable />
-				<el-table-column prop="boxId" label="编号ID" show-overflow-tooltip sortable></el-table-column>
-				<el-table-column prop="specification" label="规格" show-overflow-tooltip sortable>
+				<el-table-column prop="uuid" label="编号ID" show-overflow-tooltip sortable></el-table-column>
+				<el-table-column prop="type" label="规格" show-overflow-tooltip sortable>
 					<template #default="scope">
-						<el-tag type="primary" v-if="scope.row.specification === 'suitcase'">手提箱</el-tag>
-						<el-tag type="warning" v-else-if="scope.row.specification === 'trolley'">拉杆箱</el-tag>
-						<el-tag v-else>{{ scope.row.specification }}</el-tag>
+						<el-tag type="primary" v-if="scope.row.type === 2">手提箱</el-tag>
+						<el-tag type="warning" v-else-if="scope.row.type === 1">拉杆箱</el-tag>
+						<el-tag v-else>未知</el-tag>
 					</template>
 				</el-table-column>
 				<el-table-column prop="bindUser" label="所属用户" show-overflow-tooltip sortable>
@@ -56,30 +56,37 @@
 						<el-tag type="info" v-else>未绑定</el-tag>
 					</template>
 				</el-table-column>
-				<el-table-column prop="coverStatus" label="开盖状态" show-overflow-tooltip sortable>
+				<el-table-column prop="lock_stat" label="开盖状态" show-overflow-tooltip sortable>
 					<template #default="scope">
-						<el-tag type="danger" v-if="scope.row.coverStatus === 'open'">开</el-tag>
+						<el-tag type="danger" v-if="scope.row.lock_stat === '0'">开</el-tag>
 						<el-tag type="success" v-else>关</el-tag>
 					</template>
 				</el-table-column>
-				<el-table-column prop="healthStatus" label="健康状态" show-overflow-tooltip sortable>
+				<el-table-column prop="stat" label="激活状态" show-overflow-tooltip sortable>
 					<template #default="scope">
-						<el-tag type="success" v-if="scope.row.healthStatus === 'healthy'">健康</el-tag>
-						<el-tag type="danger" v-else>异常</el-tag>
+						<el-tag type="primary" v-if="scope.row.stat === '1'">已激活</el-tag>
+						<el-tag type="info" v-else>待激活</el-tag>
 					</template>
 				</el-table-column>
-				<el-table-column prop="fenceStatus" label="电子围栏状态" show-overflow-tooltip sortable>
+				<el-table-column prop="bt_stat" label="蓝牙状态" show-overflow-tooltip sortable>
 					<template #default="scope">
-						<el-tag type="success" v-if="scope.row.fenceStatus === 'normal'">正常</el-tag>
-						<el-tag type="warning" v-else>警告</el-tag>
+						<el-tag type="success" v-if="scope.row.bt_stat === '1'">已连接</el-tag>
+						<el-tag type="danger" v-else>未连接</el-tag>
 					</template>
 				</el-table-column>
-				<el-table-column prop="batteryLevel" label="电量状态" show-overflow-tooltip sortable>
+				<el-table-column prop="soc" label="电量状态" show-overflow-tooltip sortable>
 					<template #default="scope">
-						<span :style="{ color: scope.row.batteryLevel < 20 ? '#F56C6C' : '#67C23A' }"> {{ scope.row.batteryLevel }}% </span>
+						<span :style="{ color: Math.abs(Number(scope.row.soc)) < 20 ? '#F56C6C' : '#67C23A' }">
+							{{ Math.abs(Number(scope.row.soc)) }}%
+							<el-tag size="small" type="success" v-if="Number(scope.row.soc) < 0">充电中</el-tag>
+						</span>
 					</template>
 				</el-table-column>
-				<el-table-column prop="createdAt" label="创建时间" width="180" show-overflow-tooltip sortable></el-table-column>
+				<el-table-column prop="created_at" label="创建时间" width="180" show-overflow-tooltip sortable>
+					<template #default="scope">
+						{{ formatDateTime(scope.row.created_at) }}
+					</template>
+				</el-table-column>
 				<el-table-column label="操作" width="280">
 					<template #default="scope">
 						<el-button size="small" text type="primary" @click="onGetLocation(scope.row)">当前定位</el-button>
@@ -261,9 +268,10 @@ import { toRefs, reactive, onMounted, ref } from 'vue';
 import { ElMessageBox, ElMessage } from 'element-plus';
 import LocationMap from '/@/views/system/users/component/locationMap.vue';
 import FenceTemplateDialog from './component/FenceTemplateDialog.vue';
-import { deleteBox, getBoxList } from '/@/api/system/box';
+import { deleteBox, getBoxList, getBoxUserList, getBoxDetail } from '/@/api/system/box';
 import type { BoxInfo, BoxQueryParams } from '/@/api/system/box/types';
 import { BoxType, LockStatus, BluetoothStatus, ActivationStatus } from '/@/api/system/box/types';
+import { formatDateTime } from '/@/utils/dateUtil';
 
 // 定义接口来定义对象的类型
 interface TableDataState {
@@ -359,6 +367,7 @@ const machineCodeDialog = reactive({
 	visible: false,
 	code: 'ABC123-DEF456-GHI789-JKL012',
 });
+
 const { tableData } = toRefs(state);
 // 初始化表格数据
 const initTableData = () => {
@@ -368,12 +377,24 @@ const boxList = async () => {
 	try {
 		state.tableData.loading = true;
 		const res = await getBoxList(state.tableData.param);
-		console.log(res);
 		if (res.code === 0) {
 			state.tableData.data = res.data.list;
 			state.tableData.total = res.data.total;
+
+			// 获取每个箱体的用户绑定信息
+			for (const box of state.tableData.data) {
+				try {
+					const userRes = await getBoxUserList(box.id);
+					if (userRes.code === 0 && userRes.data.length > 0) {
+						box.bindUser = userRes.data[0]; // 假设只取第一个绑定用户
+					}
+					console.log(userRes.data[0]?.id);
+				} catch (error) {
+					console.error(`获取箱体 ${box.id} 的用户信息失败:`, error);
+				}
+			} //xjt:todo!!!
 		} else {
-			ElMessage.error(res.data.message || '获取箱体列表失败');
+			ElMessage.error(res.message || '获取箱体列表失败');
 		}
 	} catch (error) {
 		console.error('获取箱体列表失败:', error);
@@ -392,14 +413,34 @@ const onOpenFenceTemplate = () => {
 	fenceTemplateVisible.value = true;
 };
 // 获取当前定位
-const onGetLocation = (row: any) => {
-	// 直接打开定位地图弹窗
-	locationMapRef.value?.openDialog(row.boxId);
+const onGetLocation = async (row: BoxInfo) => {
+	try {
+		const res = await getBoxDetail(row.id);
+		if (res.code === 0) {
+			// 打开定位地图弹窗，传入最新的箱子信息
+			locationMapRef.value?.openDialog(res.data, 'location');
+		} else {
+			ElMessage.error(res.message || '获取箱子详情失败');
+		}
+	} catch (error) {
+		console.error('获取箱子详情失败:', error);
+		ElMessage.error('获取箱子详情失败');
+	}
 };
 // 查看轨迹记录
-const onGetTrajectory = (row: any) => {
-	// 打开轨迹地图弹窗，自动播放轨迹
-	locationMapRef.value?.openDialog(row.boxId, 'track');
+const onGetTrajectory = async (row: BoxInfo) => {
+	try {
+		const res = await getBoxDetail(row.id);
+		if (res.code === 0) {
+			// 打开轨迹地图弹窗，传入最新的箱子信息
+			locationMapRef.value?.openDialog(res.data, 'track');
+		} else {
+			ElMessage.error(res.message || '获取箱子详情失败');
+		}
+	} catch (error) {
+		console.error('获取箱子详情失败:', error);
+		ElMessage.error('获取箱子详情失败');
+	}
 };
 // 激活箱体
 const onActivateBox = (row: any) => {
@@ -465,7 +506,7 @@ onMounted(() => {
 });
 // 多选框选中数据
 const handleSelectionChange = (selection: Array<BoxInfo>) => {
-	state.ids = selection.map((item) => item.id);
+	state.ids = selection.map((item) => Number(item.id));
 };
 
 // 处理更多操作
@@ -633,7 +674,7 @@ const confirmRemoteOpen = () => {
 	// 这里应该调用API发送开箱指令
 	// 暂时更新锁状态
 	if (remoteOpenDialog.rowData) {
-		remoteOpenDialog.rowData.lock_stat = 0; // 开锁
+		remoteOpenDialog.rowData.lock_stat = '0'; // 开锁
 	}
 	cancelRemoteOpen();
 	boxList();

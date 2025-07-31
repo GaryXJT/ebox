@@ -3,7 +3,7 @@
 		<el-dialog
 			:title="dialogTitle"
 			v-model="isShowDialog"
-			width="1200px"
+			width="1400px"
 			:close-on-click-modal="false"
 			:close-on-press-escape="true"
 			destroy-on-close
@@ -44,28 +44,18 @@
 
 							<!-- 时间筛选器 -->
 							<div v-show="!mapLoading && !loadError" class="time-filter">
-								<el-form-item label="开始时间">
-									<el-date-picker
-										v-model="timeFilter.startTime"
-										type="datetime"
-										placeholder="选择开始时间"
-										format="YYYY-MM-DD HH:mm:ss"
-										value-format="YYYY-MM-DD HH:mm:ss"
-										style="width: 100%"
-										@change="handleTimeChange"
-									/>
-								</el-form-item>
-								<el-form-item label="结束时间">
-									<el-date-picker
-										v-model="timeFilter.endTime"
-										type="datetime"
-										placeholder="选择结束时间"
-										format="YYYY-MM-DD HH:mm:ss"
-										value-format="YYYY-MM-DD HH:mm:ss"
-										style="width: 100%"
-										@change="handleTimeChange"
-									/>
-								</el-form-item>
+								<div class="time-filter-label">时间范围</div>
+								<el-date-picker
+									v-model="timeFilter.timeRange"
+									type="datetimerange"
+									start-placeholder="开始时间"
+									end-placeholder="结束时间"
+									format="YYYY-MM-DD HH:mm:ss"
+									value-format="YYYY-MM-DD HH:mm:ss"
+									style="width: 100%"
+									@change="handleTimeChange"
+									:default-time="[new Date(2000, 1, 1, 0, 0, 0), new Date(2000, 1, 1, 23, 59, 59)]"
+								/>
 							</div>
 						</div>
 
@@ -96,7 +86,9 @@
 									<el-tag :type="isTrackPlaying ? 'success' : 'info'" size="small">
 										{{ isTrackPlaying ? '轨迹播放中' : '轨迹已停止' }}
 									</el-tag>
-									<span class="track-progress">当前点: {{ !mapLoading ? `${trackProgress.current + 1}/${trackProgress.total + 1}` : '---' }}</span>
+									<span class="track-progress"
+										>当前点: {{ !mapLoading && trackProgress.total > 0 ? `${trackProgress.current + 1}/${trackProgress.total + 1}` : '---' }}</span
+									>
 								</div>
 							</div>
 
@@ -106,7 +98,7 @@
 									v-model="trackProgress.current"
 									:min="0"
 									:max="trackProgress.total"
-									:disabled="!trackProgress.total || mapLoading"
+									:disabled="trackProgress.total === 0 || mapLoading"
 									:show-tooltip="true"
 									:format-tooltip="formatProgressTooltip"
 									@change="handleProgressChange"
@@ -153,27 +145,29 @@
 						<el-descriptions :column="1" border>
 							<el-descriptions-item label="箱体编号">
 								<div class="content-wrapper">
-									<span v-if="!mapLoading">{{ locationData?.boxId || '---' }}</span>
+									<span v-if="!mapLoading">{{ locationData?.uuid || '---' }}</span>
 									<div v-else class="loading-placeholder"></div>
 									<el-tag v-if="loadError" type="danger" size="small" class="ml-2">数据获取失败</el-tag>
 								</div>
 							</el-descriptions-item>
 							<template v-if="currentMode === 'location'">
-								<el-descriptions-item label="当前位置" class-name="location-content-cell">
+								<el-descriptions-item label="箱体名称" class-name="location-content-cell">
 									<div class="content-wrapper">
-										<span v-if="!mapLoading">{{ locationData?.address || '---' }}</span>
+										<span v-if="!mapLoading">{{ locationData?.name || '---' }}</span>
 										<div v-else class="loading-placeholder"></div>
 									</div>
 								</el-descriptions-item>
 								<el-descriptions-item label="更新时间">
 									<div class="content-wrapper">
-										<span v-if="!mapLoading">{{ locationData?.updateTime || '---' }}</span>
+										<span v-if="!mapLoading">{{ locationData ? formatDateTime(locationData.updated_at) : '---' }}</span>
 										<div v-else class="loading-placeholder"></div>
 									</div>
 								</el-descriptions-item>
 								<el-descriptions-item label="经纬度" class-name="coordinate-content-cell">
 									<div class="content-wrapper">
-										<span v-if="!mapLoading">{{ locationData ? `${locationData.longitude}, ${locationData.latitude}` : '---' }}</span>
+										<span v-if="!mapLoading">{{
+											locationData ? `${locationData.position.coordinates[0]}, ${locationData.position.coordinates[1]}` : '---'
+										}}</span>
 										<div v-else class="loading-placeholder"></div>
 									</div>
 								</el-descriptions-item>
@@ -181,7 +175,7 @@
 							<template v-else>
 								<el-descriptions-item label="轨迹长度">
 									<div class="content-wrapper">
-										<span v-if="!mapLoading && trackLength">{{ trackLength }} 米</span>
+										<span v-if="!mapLoading && trackLength">{{ trackLength }} 公里</span>
 										<div v-else class="loading-placeholder"></div>
 									</div>
 								</el-descriptions-item>
@@ -216,7 +210,7 @@
 							<template v-else>
 								<el-descriptions-item label="轨迹点数">
 									<div class="content-wrapper">
-										<el-tag v-if="!mapLoading" type="success"> {{ trackProgress.total + 1 }} 个点 </el-tag>
+										<el-tag v-if="!mapLoading" type="success"> {{ trackProgress.total > 0 ? trackProgress.total + 1 : 0 }} 个点 </el-tag>
 										<div v-else class="loading-placeholder" style="width: 50px"></div>
 									</div>
 								</el-descriptions-item>
@@ -241,6 +235,9 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, onUnmounted, reactive } from 'vue';
 import { ElMessage } from 'element-plus';
+import { getBoxDetail, getBoxTrackPoints } from '/@/api/system/box';
+import type { BoxTrackPoint } from '/@/api/system/box/types';
+import { formatDateTime } from '/@/utils/dateUtil';
 import { Refresh, Loading, VideoPause, VideoPlay, Close, Check } from '@element-plus/icons-vue';
 
 // 声明天地图API的全局类型
@@ -253,11 +250,21 @@ declare global {
 
 // 定义接口
 interface LocationData {
-	boxId: string;
-	address: string;
-	updateTime: string;
-	longitude: number;
-	latitude: number;
+	id: string;
+	uuid: string;
+	name: string;
+	type: string;
+	soc: string;
+	position: {
+		type: 'Point';
+		coordinates: [number, number]; // [经度, 纬度]
+	};
+	lock_stat: string;
+	bt_stat: string;
+	stat: string;
+	remarks: string;
+	created_at: string;
+	updated_at: string;
 }
 
 interface TrackPoint {
@@ -277,8 +284,7 @@ const mapLoading = ref(false);
 
 // 时间筛选相关
 const timeFilter = reactive({
-	startTime: null as string | null,
-	endTime: null as string | null,
+	timeRange: null as [string, string] | null,
 });
 
 // 轨迹线相关
@@ -296,6 +302,9 @@ const trackBounds = ref<{
 // 轨迹总长度（米）
 const trackLength = ref<number>(0);
 
+// 保存轨迹点原始数据
+const trackPointsData = ref<any[]>([]);
+
 // 轨迹相关响应式数据
 const isTrackPlaying = ref(false);
 const trackPaused = ref(false);
@@ -312,37 +321,9 @@ let marker: any = null;
 let carTrack: any = null;
 const TIANDITU_TOKEN = 'ba2a93cdedaa00e7df2b79ca5f7ecb98';
 
-// 模拟位置数据
-const mockLocations = [
-	{ address: '北京市朝阳区建国路88号', longitude: 116.4607, latitude: 39.9212 },
-	{ address: '上海市浦东新区陆家嘴环路1000号', longitude: 121.5058, latitude: 31.2456 },
-	{ address: '广州市天河区珠江新城花城大道85号', longitude: 113.3221, latitude: 23.1291 },
-	{ address: '深圳市南山区科技园南区深南大道9988号', longitude: 113.9547, latitude: 22.5463 },
-	{ address: '杭州市西湖区文三路269号', longitude: 120.1551, latitude: 30.2741 },
-	{ address: '成都市高新区天府大道北段1700号', longitude: 104.0648, latitude: 30.672 },
-];
-
-// 获取位置数据
+// 获取位置数据 - 已不再使用，改为直接传入数据
 const getLocationData = (boxId: string): Promise<LocationData> => {
-	return new Promise((resolve, reject) => {
-		setTimeout(() => {
-			if (Math.random() > 0.9) {
-				reject(new Error('获取位置信息失败'));
-				return;
-			}
-
-			const randomLocation = mockLocations[Math.floor(Math.random() * mockLocations.length)];
-			const locationData = {
-				boxId: boxId,
-				address: randomLocation.address,
-				updateTime: new Date().toLocaleString(),
-				longitude: randomLocation.longitude,
-				latitude: randomLocation.latitude,
-			};
-
-			resolve(locationData);
-		}, 1000);
-	});
+	return Promise.reject(new Error('此方法已废弃'));
 };
 
 // 动态加载天地图API
@@ -559,7 +540,8 @@ const initMap = async () => {
 
 		// 创建地图实例并初始化
 		map = new window.T.Map('mapContainer');
-		const lngLat = new window.T.LngLat(locationData.value.longitude, locationData.value.latitude);
+		const [longitude, latitude] = locationData.value.position.coordinates;
+		const lngLat = new window.T.LngLat(longitude, latitude);
 		map.centerAndZoom(lngLat, 15);
 
 		// 只在定位模式下添加标记点
@@ -584,23 +566,24 @@ const updateMapMarker = () => {
 		}
 
 		// 创建新的标记点
-		const lngLat = new window.T.LngLat(locationData.value.longitude, locationData.value.latitude);
+		const [longitude, latitude] = locationData.value.position.coordinates;
+		const lngLat = new window.T.LngLat(longitude, latitude);
 		marker = new window.T.Marker(lngLat);
 
 		// 创建信息窗口
 		const infoContent = `
 			<div style="padding: 12px; min-width: 200px; font-family: Arial, sans-serif;">
 				<h4 style="margin: 0 0 10px 0; color: #409EFF; font-size: 16px; font-weight: bold;">
-					📦 箱体编号: ${locationData.value.boxId}
+					📦 箱体编号: ${locationData.value.uuid}
 				</h4>
 				<p style="margin: 6px 0; color: #333; font-size: 14px;">
-					📍 地址: ${locationData.value.address}
+					📍 名称: ${locationData.value.name}
 				</p>
 				<p style="margin: 6px 0; color: #666; font-size: 12px;">
-					⏰ 更新时间: ${locationData.value.updateTime}
+					⏰ 更新时间: ${formatDateTime(locationData.value.updated_at)}
 				</p>
 				<p style="margin: 6px 0; color: #666; font-size: 12px;">
-					🌐 经纬度: ${locationData.value.longitude.toFixed(6)}, ${locationData.value.latitude.toFixed(6)}
+					🌐 经纬度: ${longitude.toFixed(6)}, ${latitude.toFixed(6)}
 				</p>
 			</div>
 		`;
@@ -622,104 +605,47 @@ const updateMapMarker = () => {
 };
 
 // 打开弹窗
-const openDialog = async (boxId: string, mode: 'location' | 'track' = 'location') => {
+const openDialog = async (boxData: LocationData, mode: 'location' | 'track' = 'location') => {
 	isShowDialog.value = true;
 	currentMode.value = mode;
 	loadError.value = false;
-	locationData.value = null;
+	locationData.value = boxData;
 	mapLoading.value = true;
 
 	try {
-		locationData.value = await getLocationData(boxId);
 		await nextTick();
 		await initMap();
 
 		// 轨迹模式下初始化轨迹数据
 		if (mode === 'track') {
 			await nextTick(); // 确保地图完全初始化
-			const trackData = generateMockTrackData(locationData.value);
-			trackProgress.value = { current: 0, total: trackData.length - 1 };
-
-			// 绘制轨迹线
-			const T = window.T;
-			trackLine.value = new T.Polyline(trackData, {
-				color: '#409EFF',
-				weight: 4,
-				opacity: 0.8,
-				lineStyle: 'solid',
-			});
-			map.addOverLay(trackLine.value);
-
-			// 将地图视野调整到轨迹范围
-			const bounds = new T.LngLatBounds(trackData[0], trackData[0]);
-			trackData.forEach((point: any) => bounds.extend(point));
-			map.setViewport(trackData);
-
-			// 计算轨迹总长度
-			let totalLength = 0;
-			for (let i = 1; i < trackData.length; i++) {
-				const prevPoint = trackData[i - 1];
-				const currentPoint = trackData[i];
-				totalLength += prevPoint.distanceTo(currentPoint);
-			}
-			trackLength.value = Math.round(totalLength);
-
-			// 获取起终点地址
-			trackBounds.value = {
-				start: { address: '获取地址中...' },
-				end: { address: '获取地址中...' },
-			};
-
-			// 异步获取起终点地址
-			if (trackData.length > 0) {
-				reverseGeocode(trackData[0])
-					.then((address) => {
-						if (trackBounds.value) {
-							trackBounds.value.start = { address };
-						}
-					})
-					.catch(() => {
-						if (trackBounds.value) {
-							trackBounds.value.start = { address: '地址解析失败' };
-						}
+			try {
+				const res = await getBoxTrackPoints({
+					boxId: locationData.value.id,
+					pageNum: 1,
+					pageSize: 1000,
+				});
+				console.log(res);
+				if (res.code === 0) {
+					// 保存原始轨迹点数据
+					trackPointsData.value = res.data.list;
+					const trackPoints = res.data.list.map((point: BoxTrackPoint) => {
+						const [lng, lat] = point.point.coordinates;
+						return new window.T.LngLat(lng, lat);
 					});
-
-				const endPoint = trackData[trackData.length - 1];
-				reverseGeocode(endPoint)
-					.then((address) => {
-						if (trackBounds.value) {
-							trackBounds.value.end = { address };
-						}
-					})
-					.catch(() => {
-						if (trackBounds.value) {
-							trackBounds.value.end = { address: '地址解析失败' };
-						}
-					});
+					if (trackPoints.length > 0) {
+						reinitTrackData(trackPoints);
+						ElMessage.success(`已加载 ${trackPoints.length} 个轨迹点`);
+					} else {
+						ElMessage.warning('暂无轨迹点数据');
+					}
+				} else {
+					ElMessage.error(res.message || '获取轨迹点失败');
+				}
+			} catch (error) {
+				console.error('获取轨迹点失败:', error);
+				ElMessage.error('获取轨迹点失败');
 			}
-
-			// 初始化轨迹动画
-			carTrack = new T.CarTrack(map, {
-				Datas: trackData,
-				interval: 300,
-				carstyle: {
-					display: true,
-					iconUrl:
-						'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJMMTMuMDkgOC4yNkwyMSA5TDEzLjA5IDE1Ljc0TDEyIDIyTDEwLjkxIDE1Ljc0TDMgOUwxMC45MSA4LjI2TDEyIDJaIiBmaWxsPSIjNDA5RUZGIi8+Cjwvc3ZnPgo=',
-					width: 24,
-					height: 24,
-				},
-				passOneNode: (lnglat: any, index: number, total: number) => {
-					trackProgress.value = { current: index, total: total };
-				},
-				onTrackComplete: () => {
-					isTrackPlaying.value = false;
-					trackPaused.value = false;
-					ElMessage.success('轨迹播放完成');
-				},
-			});
-
-			ElMessage.success(`已加载 ${trackData.length} 个轨迹点`);
 		}
 	} catch (error: any) {
 		console.error('获取位置信息失败:', error);
@@ -747,6 +673,8 @@ const closeDialog = () => {
 	isTrackPlaying.value = false;
 	trackPaused.value = false;
 	trackProgress.value = { current: 0, total: 0 };
+	trackLength.value = 0; // 重置轨迹长度
+	timeFilter.timeRange = null; // 重置时间范围
 
 	// 清理地图实例
 	if (map) {
@@ -763,13 +691,18 @@ const closeDialog = () => {
 
 // 刷新位置信息
 const refreshLocation = async () => {
-	if (!locationData.value?.boxId) return;
+	if (!locationData.value?.id) return;
 
 	loadError.value = false;
 	try {
-		locationData.value = await getLocationData(locationData.value.boxId);
-		updateMapMarker();
-		ElMessage.success('位置信息已更新');
+		const res = await getBoxDetail(locationData.value.id);
+		if (res.code === 0) {
+			locationData.value = res.data;
+			updateMapMarker();
+			ElMessage.success('位置信息已更新');
+		} else {
+			throw new Error(res.message);
+		}
 	} catch (error: any) {
 		console.error('刷新位置信息失败:', error);
 		loadError.value = true;
@@ -786,14 +719,6 @@ const startTrack = () => {
 		isTrackPlaying.value = true;
 		trackPaused.value = false;
 		ElMessage.success('轨迹播放开始');
-	} else {
-		const trackData = reinitTrackData();
-		if (trackData) {
-			carTrack?.start();
-			isTrackPlaying.value = true;
-			trackPaused.value = false;
-			ElMessage.success('轨迹播放开始');
-		}
 	}
 };
 
@@ -818,6 +743,7 @@ const stopTrack = () => {
 	}
 	isTrackPlaying.value = false;
 	trackPaused.value = false;
+	trackLength.value = 0; // 重置轨迹长度
 
 	// 轨迹模式下不显示原始标记点
 	if (currentMode.value === 'location' && locationData.value) {
@@ -825,24 +751,46 @@ const stopTrack = () => {
 	}
 };
 
-const restartTrack = () => {
-	if (locationData.value) {
-		const trackData = reinitTrackData();
-		if (trackData) {
-			carTrack?.start();
-			isTrackPlaying.value = true;
-			trackPaused.value = false;
-			ElMessage.success('轨迹重新播放');
+const restartTrack = async () => {
+	if (!locationData.value?.id) return;
+
+	try {
+		const res = await getBoxTrackPoints({
+			boxId: locationData.value.id,
+			pageNum: 1,
+			pageSize: 1000,
+		});
+		if (res.code === 0) {
+			// 保存原始轨迹点数据
+			trackPointsData.value = res.data.list;
+			const trackPoints = res.data.list.map((point: BoxTrackPoint) => {
+				const [lng, lat] = point.point.coordinates;
+				return new window.T.LngLat(lng, lat);
+			});
+			if (trackPoints.length > 0) {
+				reinitTrackData(trackPoints);
+				carTrack?.start();
+				isTrackPlaying.value = true;
+				trackPaused.value = false;
+				ElMessage.success('轨迹重新播放');
+			} else {
+				ElMessage.warning('暂无轨迹点数据');
+			}
+		} else {
+			ElMessage.error(res.message || '获取轨迹点失败');
 		}
+	} catch (error) {
+		console.error('获取轨迹点失败:', error);
+		ElMessage.error('获取轨迹点失败');
 	}
 };
 
 // 格式化进度条提示
 const formatProgressTooltip = (value: number): string => {
-	if (!carTrack?.options.Datas) return `点 ${value + 1}`;
-	const point = carTrack.options.Datas[value];
-	if (!point) return `点 ${value + 1}`;
-	return `点 ${value + 1}\n经度: ${point.lng.toFixed(6)}\n纬度: ${point.lat.toFixed(6)}`;
+	const trackPointData = trackPointsData.value[value];
+	if (!trackPointData) return `点 ${value + 1}`;
+	const [lng, lat] = trackPointData.point.coordinates;
+	return `点 ${value + 1}\n经度: ${lng.toFixed(6)}\n纬度: ${lat.toFixed(6)}\n时间: ${trackPointData.timestamp}`;
 };
 
 // 逆地理编码 - 将经纬度转换为地址
@@ -900,39 +848,45 @@ const handleProgressChange = async (value: number) => {
 		trackPaused.value = true;
 	}
 
-	// 更新位置
-	const point = carTrack.options.Datas[value];
-	if (point) {
-		carTrack.carMarker.setLnglat(point);
+	// 从轨迹点数据中获取当前点
+	const trackPointData = trackPointsData.value[value];
+	if (trackPointData) {
+		const [lng, lat] = trackPointData.point.coordinates;
+		const currentLngLat = new window.T.LngLat(lng, lat);
+
+		// 更新标记点位置
+		carTrack.carMarker.setLnglat(currentLngLat);
 
 		// 计算旋转角度
 		if (value > 0) {
-			const prevPoint = carTrack.options.Datas[value - 1];
-			const angle = carTrack.calculateAngle(prevPoint, point);
+			const prevPointData = trackPointsData.value[value - 1];
+			const [prevLng, prevLat] = prevPointData.point.coordinates;
+			const prevLngLat = new window.T.LngLat(prevLng, prevLat);
+			const angle = (Math.atan2(lat - prevLat, lng - prevLng) * 180) / Math.PI;
 			carTrack.carMarker.setRotate(angle);
 		}
 
 		// 更新进度和当前点信息
 		trackProgress.value.current = value;
 		currentPoint.value = {
-			lng: point.lng,
-			lat: point.lat,
-			time: point.time || new Date().toLocaleString(), // 模拟数据时间
+			lng,
+			lat,
+			time: trackPointData.timestamp,
 			address: '获取地址中...',
 		};
 
 		// 将地图中心移动到当前点
-		map.panTo(point);
+		map.panTo(currentLngLat);
 
 		// 获取地址信息
 		try {
-			const address = await reverseGeocode(point);
-			if (currentPoint.value && currentPoint.value.lng === point.lng && currentPoint.value.lat === point.lat) {
+			const address = await reverseGeocode({ lng, lat });
+			if (currentPoint.value && currentPoint.value.lng === lng && currentPoint.value.lat === lat) {
 				currentPoint.value.address = address;
 			}
 		} catch (error) {
 			console.warn('获取地址失败:', error);
-			if (currentPoint.value && currentPoint.value.lng === point.lng && currentPoint.value.lat === point.lat) {
+			if (currentPoint.value && currentPoint.value.lng === lng && currentPoint.value.lat === lat) {
 				currentPoint.value.address = '地址解析失败';
 			}
 		}
@@ -940,24 +894,138 @@ const handleProgressChange = async (value: number) => {
 };
 
 // 处理时间筛选变化
-const handleTimeChange = () => {
-	if (!timeFilter.startTime || !timeFilter.endTime) return;
+const handleTimeChange = async () => {
+	if (!locationData.value?.id) return;
 
-	// 这里应该调用后端API获取指定时间范围内的轨迹点
-	// 目前使用模拟数据，仅更新点数显示
-	stopTrack();
-	const trackData = reinitTrackData();
-	if (trackData) {
-		ElMessage.success(`已加载 ${trackData.length} 个轨迹点`);
+	try {
+		// 停止当前轨迹播放
+		stopTrack();
+
+		// 如果没有选择时间范围，重新加载初始数据
+		if (!timeFilter.timeRange || timeFilter.timeRange.length !== 2) {
+			const params = {
+				boxId: locationData.value.id,
+				pageNum: 1,
+				pageSize: 1000,
+			};
+			const res = await getBoxTrackPoints(params);
+			if (res.code === 0) {
+				if (res.data.list.length === 0) {
+					ElMessage.warning('暂无轨迹点数据');
+					// 清空轨迹数据
+					trackPointsData.value = [];
+					// 清空当前点信息
+					currentPoint.value = null;
+					// 重置进度
+					trackProgress.value = { current: 0, total: 0 };
+					// 重置轨迹长度
+					trackLength.value = 0;
+					// 清除地图上的轨迹线和标记点
+					if (trackLine.value) {
+						map.removeOverLay(trackLine.value);
+						trackLine.value = null;
+					}
+					if (carTrack) {
+						carTrack.clear();
+						carTrack = null;
+					}
+				} else {
+					// 保存原始轨迹点数据
+					trackPointsData.value = res.data.list;
+					const trackPoints = res.data.list.map((point: BoxTrackPoint) => {
+						const [lng, lat] = point.point.coordinates;
+						return new window.T.LngLat(lng, lat);
+					});
+					// 重新初始化轨迹数据
+					reinitTrackData(trackPoints);
+					// 重置进度和当前点信息
+					trackProgress.value = { current: 0, total: trackPoints.length - 1 };
+					if (trackPoints.length > 0) {
+						const firstPoint = trackPointsData.value[0];
+						currentPoint.value = {
+							lng: firstPoint.point.coordinates[0],
+							lat: firstPoint.point.coordinates[1],
+							time: firstPoint.timestamp,
+							address: '获取地址中...',
+						};
+					}
+					ElMessage.success(`已加载 ${trackPoints.length} 个轨迹点`);
+				}
+			} else {
+				ElMessage.error(res.message || '获取轨迹点失败');
+			}
+			return;
+		}
+
+		const params = {
+			boxId: locationData.value.id,
+			pageNum: 1,
+			pageSize: 1000,
+			timestampstart: timeFilter.timeRange[0],
+			timestampend: timeFilter.timeRange[1],
+		};
+
+		const res = await getBoxTrackPoints(params);
+		if (res.code === 0) {
+			if (res.data.list.length === 0) {
+				ElMessage.warning('所选时间范围内没有轨迹点数据');
+				// 清空轨迹数据
+				trackPointsData.value = [];
+				// 清空当前点信息
+				currentPoint.value = null;
+				// 重置进度
+				trackProgress.value = { current: 0, total: 0 };
+				// 重置轨迹长度
+				trackLength.value = 0;
+				// 清除地图上的轨迹线和标记点
+				if (trackLine.value) {
+					map.removeOverLay(trackLine.value);
+					trackLine.value = null;
+				}
+				if (carTrack) {
+					carTrack.clear();
+					carTrack = null;
+				}
+				return;
+			}
+
+			// 保存原始轨迹点数据
+			trackPointsData.value = res.data.list;
+			const trackPoints = res.data.list.map((point: BoxTrackPoint) => {
+				const [lng, lat] = point.point.coordinates;
+				return new window.T.LngLat(lng, lat);
+			});
+
+			// 重新初始化轨迹数据
+			reinitTrackData(trackPoints);
+
+			// 重置进度和当前点信息
+			trackProgress.value = { current: 0, total: trackPoints.length - 1 };
+			if (trackPoints.length > 0) {
+				const firstPoint = trackPointsData.value[0];
+				currentPoint.value = {
+					lng: firstPoint.point.coordinates[0],
+					lat: firstPoint.point.coordinates[1],
+					time: firstPoint.timestamp,
+					address: '获取地址中...',
+				};
+			}
+
+			ElMessage.success(`已加载 ${trackPoints.length} 个轨迹点`);
+		} else {
+			ElMessage.error(res.message || '获取轨迹点失败');
+		}
+	} catch (error) {
+		console.error('获取轨迹点失败:', error);
+		ElMessage.error('获取轨迹点失败');
 	}
 };
 
 // 重新初始化轨迹数据
-const reinitTrackData = () => {
-	if (!map || !locationData.value) return;
+const reinitTrackData = (trackPoints: any[]) => {
+	if (!map || !locationData.value || !trackPoints.length) return;
 
-	const trackData = generateMockTrackData(locationData.value);
-	trackProgress.value = { current: 0, total: trackData.length - 1 };
+	trackProgress.value = { current: 0, total: trackPoints.length - 1 };
 
 	// 清除现有标记点和轨迹线
 	if (marker) {
@@ -972,7 +1040,7 @@ const reinitTrackData = () => {
 
 	// 绘制轨迹线
 	const T = window.T;
-	trackLine.value = new T.Polyline(trackData, {
+	trackLine.value = new T.Polyline(trackPoints, {
 		color: '#409EFF',
 		weight: 4,
 		opacity: 0.8,
@@ -981,23 +1049,44 @@ const reinitTrackData = () => {
 	map.addOverLay(trackLine.value);
 
 	// 将地图视野调整到轨迹范围
-	const bounds = new T.LngLatBounds(trackData[0], trackData[0]);
-	trackData.forEach((point: any) => bounds.extend(point));
-	map.setViewport(trackData);
+	const bounds = new T.LngLatBounds(trackPoints[0], trackPoints[0]);
+	trackPoints.forEach((point: any) => bounds.extend(point));
+	map.setViewport(trackPoints);
+
+	// 计算轨迹总长度
+	let totalLength = 0;
+	for (let i = 1; i < trackPoints.length; i++) {
+		const prevPoint = trackPoints[i - 1];
+		const currentPoint = trackPoints[i];
+		// 使用天地图的距离计算方法
+		totalLength += prevPoint.distanceTo(currentPoint);
+	}
+	// 转换为公里并保留两位小数
+	trackLength.value = Number((totalLength / 1000).toFixed(4));
 
 	// 初始化轨迹动画
 	carTrack = new T.CarTrack(map, {
-		Datas: trackData,
+		Datas: trackPoints,
 		interval: 300,
 		carstyle: {
 			display: true,
 			iconUrl:
-				'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJMMTMuMDkgOC4yNkwyMSA5TDEzLjA5IDE1Ljc0TDEyIDIyTDEwLjkxIDE1Ljc0TDMgOUwxMC45MSA4LjI2TDEyIDJaIiBmaWxsPSIjNDA5RUZGIi8+Cjwvc3ZnPgo=',
+				'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJMMTMuMDkgOC4yNkwyMSA5TDEzLjA5IDE1Ljc0TDEyIDIyTDEwLjkxIDE1Ljc0TDMgOUwxMC45MSA4LjI2TDEyIDJaIiBmaWxsPSIjRjU2QzZDIi8+Cjwvc3ZnPgo=',
 			width: 24,
 			height: 24,
 		},
 		passOneNode: (lnglat: any, index: number, total: number) => {
-			trackProgress.value = { current: index, total: total };
+			trackProgress.value = { current: index - 1, total: total - 1 };
+			const trackPointData = trackPointsData.value[index - 1];
+			if (trackPointData) {
+				const [lng, lat] = trackPointData.point.coordinates;
+				currentPoint.value = {
+					lng,
+					lat,
+					time: trackPointData.timestamp,
+					address: '获取地址中...',
+				};
+			}
 		},
 		onTrackComplete: () => {
 			isTrackPlaying.value = false;
@@ -1005,32 +1094,6 @@ const reinitTrackData = () => {
 			ElMessage.success('轨迹播放完成');
 		},
 	});
-
-	return trackData;
-};
-
-// 生成模拟轨迹数据
-const generateMockTrackData = (centerPoint: LocationData): any[] => {
-	const points: any[] = [];
-	const baseLatitude = centerPoint.latitude;
-	const baseLongitude = centerPoint.longitude;
-	const T = window.T;
-
-	// 生成围绕中心点的轨迹路径
-	const totalPoints = 15;
-	const radius = 0.005; // 大约500米的轨迹范围
-
-	for (let i = 0; i <= totalPoints; i++) {
-		const angle = (i / totalPoints) * 2 * Math.PI;
-		const deltaLat = Math.sin(angle) * radius;
-		const deltaLng = Math.cos(angle) * radius;
-
-		// 直接创建 T.LngLat 对象
-		const point = new T.LngLat(baseLongitude + deltaLng, baseLatitude + deltaLat);
-		points.push(point);
-	}
-
-	return points;
 };
 
 // 组件卸载时清理
@@ -1139,31 +1202,20 @@ defineExpose({
 					background-color: #f8f9fa;
 					border: 1px solid #e4e7ed;
 					border-radius: 4px;
+					display: flex;
+					flex-direction: column;
+					gap: 8px;
 
-					:deep(.el-form-item) {
-						margin-bottom: 16px;
-						display: flex;
-						align-items: center;
+					.time-filter-label {
+						color: #606266;
+						font-size: 14px;
+						font-weight: 500;
+						line-height: 32px;
+						padding: 0 12px 0 0;
+					}
 
-						&:last-child {
-							margin-bottom: 0;
-						}
-
-						.el-form-item__label {
-							padding: 0 12px 0 0;
-							line-height: 32px;
-							height: 32px;
-							color: #606266;
-						}
-
-						.el-form-item__content {
-							flex: 1;
-							min-width: 0;
-						}
-
-						.el-date-editor {
-							width: 100%;
-						}
+					:deep(.el-date-editor) {
+						width: 100%;
 					}
 				}
 			}
