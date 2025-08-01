@@ -210,6 +210,7 @@
 import { ref, reactive, onMounted, watch, nextTick, onUnmounted, computed } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Loading, LocationFilled, Edit, FolderOpened, DocumentAdd, Delete, Position } from '@element-plus/icons-vue';
+import request from '/@/utils/request';
 
 // 组件属性
 interface Props {
@@ -218,6 +219,67 @@ interface Props {
 
 const props = defineProps<Props>();
 const emit = defineEmits(['update:visible']);
+
+// API函数：获取围栏模板列表
+const getFenceTemplateList = async () => {
+	try {
+		const res = await request({
+			url: '/api/v1/ebox/eboxFences/list',
+			method: 'get',
+			params: {
+				pageNum: 1,
+				pageSize: 10,
+			},
+		});
+
+		if (res.code === 0) {
+			// 处理返回的模板数据
+			if (res.data?.list) {
+				const processedTemplates = res.data.list.map((template: any) => {
+					try {
+						// 解析JSON字符串字段
+						const mapCenter = JSON.parse(template.mapCenter || '{"lng": 116.403874, "lat": 39.915661}');
+						const fences = JSON.parse(template.fences || '[]');
+						const metadata = JSON.parse(template.metadata || '{}');
+
+						return {
+							id: template.id.toString(),
+							name: template.name,
+							description: template.description || '',
+							createTime: template.createdAt || new Date().toLocaleString(),
+							mapCenter: mapCenter,
+							mapZoom: template.mapZoom || 13,
+							fences: fences,
+							metadata: metadata,
+						};
+					} catch (parseError) {
+						console.error('解析模板数据失败:', parseError, template);
+						// 返回默认结构以防止整个列表崩溃
+						return {
+							id: template.id.toString(),
+							name: template.name || '未知模板',
+							description: template.description || '',
+							createTime: template.createdAt || new Date().toLocaleString(),
+							mapCenter: { lng: 116.403874, lat: 39.915661 },
+							mapZoom: 13,
+							fences: [],
+							metadata: {},
+						};
+					}
+				});
+
+				savedTemplates.value = processedTemplates;
+				ElMessage.success(`围栏模板加载成功，共 ${processedTemplates.length} 个模板`);
+			}
+		} else {
+			ElMessage.error(res.message || '获取围栏模板失败');
+		}
+	} catch (error) {
+		console.error('获取围栏模板失败:', error);
+		ElMessage.error('获取围栏模板失败');
+	}
+};
+
 //todo xjt:点击模板之后应该出现模板对应的围栏，而不是直接增加 切换现在逻辑有问题 而且应该显示模板id以确认是否是新增的
 // 响应式数据
 const mapContainer = ref<HTMLElement>();
@@ -249,49 +311,8 @@ const saveDialog = reactive({
 	coordinates: [] as any[],
 });
 
-// 已保存的模板
-const savedTemplates = ref<FenceTemplate[]>([
-	{
-		id: '1',
-		name: '办公区域围栏',
-		description: '办公楼周边区域',
-		createTime: '2024-01-15 10:30:00',
-		mapCenter: { lng: 116.403874, lat: 39.915661 },
-		mapZoom: 12,
-		fences: [
-			{
-				type: 'polygon',
-				coordinates: [
-					{ lng: 116.4, lat: 39.91 },
-					{ lng: 116.41, lat: 39.91 },
-					{ lng: 116.41, lat: 39.92 },
-					{ lng: 116.4, lat: 39.92 },
-				],
-				area: 120000,
-				perimeter: 1400,
-			},
-		],
-	},
-	{
-		id: '2',
-		name: '停车场围栏',
-		description: '员工停车区域',
-		createTime: '2024-01-14 16:20:00',
-		mapCenter: { lng: 116.403874, lat: 39.915661 },
-		mapZoom: 15,
-		fences: [
-			{
-				type: 'rectangle',
-				coordinates: [
-					{ lng: 116.4, lat: 39.91 },
-					{ lng: 116.405, lat: 39.915 },
-				],
-				area: 31000,
-				perimeter: 700,
-			},
-		],
-	},
-]);
+// 已保存的模板（从API获取）
+const savedTemplates = ref<FenceTemplate[]>([]);
 
 // 表单验证规则
 const saveRules = {
@@ -352,7 +373,10 @@ watch(
 		if (newVal) {
 			// 对话框打开时
 			await nextTick();
+			// 初始化地图
 			initMap();
+			// 获取围栏模板列表
+			getFenceTemplateList();
 		} else if (oldVal && !newVal) {
 			// 对话框关闭时清理
 			console.log('对话框关闭，清理资源');
@@ -422,6 +446,107 @@ watch(
 	}
 );
 
+// 仅使用IP地址获取用户位置
+const getUserLocation = (): Promise<{ lng: number; lat: number }> => {
+	return new Promise((resolve) => {
+		console.log('开始通过IP获取用户位置...');
+
+		// 设置总体超时，确保不会卡太久
+		const overallTimeout = setTimeout(() => {
+			console.log('IP定位超时，使用默认位置');
+			resolve({ lng: 116.403874, lat: 39.915661 });
+		}, 2000); // 总体超时2秒
+
+		const resolveAndClearTimeout = (location: { lng: number; lat: number }) => {
+			clearTimeout(overallTimeout);
+			resolve(location);
+		};
+
+		// 直接使用IP定位
+		getLocationByIP()
+			.then((location) => {
+				console.log('IP定位成功:', location);
+				resolveAndClearTimeout(location);
+			})
+			.catch((error) => {
+				console.log('IP定位失败:', error, '使用默认位置');
+				// IP定位失败，使用默认位置（北京）
+				resolveAndClearTimeout({ lng: 116.403874, lat: 39.915661 });
+			});
+	});
+};
+
+// 通过天地图IP定位API获取位置
+const getLocationByIP = (): Promise<{ lng: number; lat: number }> => {
+	return new Promise((resolve, reject) => {
+		// 创建超时控制器
+		const controller = new AbortController();
+		const timeoutId = setTimeout(() => {
+			controller.abort();
+			reject('IP定位超时');
+		}, 2000); // IP定位超时2秒
+
+		// 使用天地图IP定位API
+		const tianDiTuKey = 'ba2a93cdedaa00e7df2b79ca5f7ecb98'; // 天地图API密钥
+		fetch(`https://api.tianditu.gov.cn/v2/geocoding/position?type=ip&output=json&tk=${tianDiTuKey}`, {
+			signal: controller.signal,
+			method: 'GET',
+		})
+			.then((response) => response.json())
+			.then((data) => {
+				clearTimeout(timeoutId);
+				console.log('天地图IP定位返回:', data);
+
+				if (data.status === '0' && data.result && data.result.location) {
+					// 天地图返回的坐标格式：{lng: xxx, lat: xxx}
+					resolve({
+						lng: parseFloat(data.result.location.lng),
+						lat: parseFloat(data.result.location.lat),
+					});
+				} else {
+					console.log('天地图IP定位失败，尝试备用服务');
+					// 如果天地图IP定位失败，使用备用的第三方服务
+					tryBackupIPService(resolve, reject);
+				}
+			})
+			.catch((error) => {
+				clearTimeout(timeoutId);
+				console.log('天地图IP定位请求失败:', error);
+				// 网络请求失败，使用备用服务
+				tryBackupIPService(resolve, reject);
+			});
+	});
+};
+
+// 备用IP定位服务
+const tryBackupIPService = (resolve: Function, reject: Function) => {
+	const controller = new AbortController();
+	const timeoutId = setTimeout(() => {
+		controller.abort();
+		reject('备用IP定位超时');
+	}, 1500);
+
+	fetch('https://ipapi.co/json/', {
+		signal: controller.signal,
+	})
+		.then((response) => response.json())
+		.then((data) => {
+			clearTimeout(timeoutId);
+			if (data.latitude && data.longitude) {
+				resolve({
+					lng: parseFloat(data.longitude),
+					lat: parseFloat(data.latitude),
+				});
+			} else {
+				reject('备用IP定位失败');
+			}
+		})
+		.catch(() => {
+			clearTimeout(timeoutId);
+			reject('所有IP定位服务不可用');
+		});
+};
+
 // 初始化地图
 const initMap = async () => {
 	if (!mapContainer.value) {
@@ -435,8 +560,10 @@ const initMap = async () => {
 	try {
 		console.log('开始初始化地图...');
 
-		// 动态加载天地图API
-		await loadTianDiTuAPI();
+		// 并行处理：同时加载天地图API和获取用户位置
+		const [, userLocation] = await Promise.all([loadTianDiTuAPI(), getUserLocation()]);
+
+		console.log('用户位置:', userLocation);
 
 		// 等待一下确保DOM准备好
 		await nextTick();
@@ -449,7 +576,8 @@ const initMap = async () => {
 		console.log('创建地图实例...');
 		// 创建地图实例，使用唯一的容器ID
 		map = new (window as any).T.Map('fenceTemplateMapContainer');
-		map.centerAndZoom(new (window as any).T.LngLat(116.403874, 39.915661), 12);
+		// 使用用户位置作为中心点
+		map.centerAndZoom(new (window as any).T.LngLat(userLocation.lng, userLocation.lat), 12);
 
 		// 添加控件
 		map.addControl(new (window as any).T.Control.Zoom());
@@ -1312,46 +1440,71 @@ const confirmSave = async () => {
 			style: fence.style,
 		}));
 
-		// 要发给后端的数据
-		const backendData = {
-			id: currentTemplate.value?.id || Date.now().toString(),
+		// 准备发送给API的数据
+		const apiData = {
 			name: saveDialog.name,
 			description: saveDialog.description,
-			mapCenter: { lng: mapCenter.lng, lat: mapCenter.lat },
+			mapCenter: {
+				lng: mapCenter.lng,
+				lat: mapCenter.lat,
+			},
 			mapZoom: mapZoom,
 			fences: fences,
-			createTime: currentTemplate.value?.createTime || new Date().toLocaleString(),
-			// 额外的元数据
 			metadata: {
 				totalFences: fences.length,
 				fenceTypes: [...new Set(fences.map((f) => f.type))],
 				totalArea: fences.reduce((sum, f) => sum + (f.area || 0), 0),
 				totalPerimeter: fences.reduce((sum, f) => sum + (f.perimeter || 0), 0),
-				lastModified: new Date().toISOString(),
+				createTime: new Date().toISOString(),
 				version: '1.0',
 			},
 		};
 
-		// 如果是编辑现有模板，更新它
-		if (currentTemplate.value?.id) {
-			const index = savedTemplates.value.findIndex((t) => t.id === currentTemplate.value?.id);
-			if (index !== -1) {
-				savedTemplates.value[index] = backendData;
-				ElMessage.success('模板更新成功');
-			}
+		console.log('保存模板数据:', apiData);
+
+		// 判断是新建还是编辑
+		const isEdit = !!currentTemplate.value?.id;
+		let res;
+
+		if (isEdit) {
+			// 编辑模板：调用PUT接口，需要添加id字段
+			const editData = {
+				...apiData,
+				id: currentTemplate.value?.id, // 添加要编辑的围栏id
+			};
+
+			console.log('编辑模板，ID:', currentTemplate.value?.id);
+			res = await request({
+				url: '/api/v1/ebox/eboxFences/edit',
+				method: 'put',
+				data: editData,
+			});
 		} else {
-			// 新建模板
-			savedTemplates.value.unshift(backendData);
-			ElMessage.success('新模板保存成功');
+			// 新建模板：调用POST接口
+			console.log('新建模板');
+			res = await request({
+				url: '/api/v1/ebox/eboxFences/add',
+				method: 'post',
+				data: apiData,
+			});
 		}
 
-		// 重置当前模板
-		currentTemplate.value = null;
+		if (res.code === 0) {
+			ElMessage.success(isEdit ? '模板更新成功' : '模板保存成功');
 
-		cancelSave();
+			// 保存成功后重新获取模板列表
+			await getFenceTemplateList();
+
+			// 重置当前模板
+			currentTemplate.value = null;
+
+			cancelSave();
+		} else {
+			ElMessage.error(res.message || (isEdit ? '模板更新失败' : '模板保存失败'));
+		}
 	} catch (error) {
-		console.error('保存失败:', error);
-		ElMessage.error('保存失败');
+		console.error('保存模板失败:', error);
+		ElMessage.error('模板保存失败');
 	}
 };
 

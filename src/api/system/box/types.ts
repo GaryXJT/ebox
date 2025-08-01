@@ -17,11 +17,7 @@ export interface BoxInfo {
 	updated_at: string; // 更新时间
 	deleted_at: string; // 删除时间
 	// 可选的绑定用户信息，通过单独的接口获取
-	bindUser?: {
-		id: number;
-		name: string;
-		dept: string;
-	};
+	user_name?: string;
 }
 
 // 箱体列表查询参数接口

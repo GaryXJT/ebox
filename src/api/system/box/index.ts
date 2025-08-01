@@ -52,6 +52,23 @@ export function getBoxList(params: BoxQueryParams): Promise<ApiResponse<PageResu
 	});
 }
 
+// 远程开箱
+export function unlockBox(id: number) {
+	return request({
+		url: `/api/v1/ebox/eboxBoxes/unlock`,
+		method: 'put',
+		params: { id },
+	});
+}
+
+export function getBoxListWithUser(params: BoxQueryParams): Promise<ApiResponse<PageResult<BoxInfo>>> {
+	return request({
+		url: '/api/v1/ebox/eboxBoxes/listuser',
+		method: 'get',
+		params,
+	});
+}
+
 /**
  * 添加箱体
  * @param data 箱体信息
@@ -68,9 +85,21 @@ export function addBox(data: Omit<BoxInfo, 'id'>) {
  * 修改箱体信息
  * @param data 箱体信息
  */
-export function updateBox(data: Partial<BoxInfo> & { id: number }) {
+export function updateBox(data: { id: number; name: string; type: number; remarks?: string }) {
 	return request<ApiResponse<void>>({
 		url: '/api/v1/ebox/eboxBoxes/edit',
+		method: 'put',
+		data,
+	});
+}
+
+/**
+ * 激活箱体
+ * @param data 激活信息
+ */
+export function activateBox(data: { id: number; name: string; type: number; remarks?: string }) {
+	return request<ApiResponse<void>>({
+		url: '/api/v1/ebox/eboxBoxes/active',
 		method: 'put',
 		data,
 	});
@@ -97,5 +126,29 @@ export function getBoxTrackPoints(params: GetBoxTrackPointsParams) {
 		url: '/api/v1/ebox/eboxBoxPoints/list',
 		method: 'get',
 		params,
+	});
+}
+
+/**
+ * 绑定用户与箱体
+ * @param data 绑定信息
+ */
+export function bindUserBox(data: { userId: number; eboxId: number }) {
+	return request<ApiResponse<void>>({
+		url: '/api/v1/ebox/eboxUserBox/add',
+		method: 'post',
+		data,
+	});
+}
+
+/**
+ * 解绑用户与箱体
+ * @param data 解绑信息
+ */
+export function unbindUserBox(data: { userId: number; eboxId: number }) {
+	return request<ApiResponse<void>>({
+		url: '/api/v1/ebox/eboxUserBox/delete',
+		method: 'delete',
+		data,
 	});
 }
